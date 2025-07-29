@@ -40,12 +40,15 @@ class StyleGAN2Loss(Loss):
         self.blur_fade_kimg     = blur_fade_kimg
 
     def run_G(self, z, z2, c, update_emas=False):
-        ws = self.G.mapping(z, z2, c, update_emas=update_emas)
+        ws = self.G.mapping(z, c, update_emas=update_emas)
+        ws2 = self.G.mapping2(z2, c, update_emas=update_emas) if z2 is not None else ws1.clone()
         if self.style_mixing_prob > 0:
             with torch.autograd.profiler.record_function('style_mixing'):
                 cutoff = torch.empty([], dtype=torch.int64, device=ws.device).random_(1, ws.shape[1])
                 cutoff = torch.where(torch.rand([], device=ws.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws.shape[1]))
                 ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), torch.randn_like(z2), c, update_emas=False)[:, cutoff:]
+        else:
+            ws = (ws + ws2) / 2
         img = self.G.synthesis(ws, update_emas=update_emas)
         return img, ws
 
