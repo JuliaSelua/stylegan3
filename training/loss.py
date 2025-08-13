@@ -32,7 +32,7 @@ def dlib_get_face_embedding(img_tensor):
     embeddings = []
     
     for i in range(batch_size):
-        img = img_tensor[i].permute(1,2,0).cpu().numpy()  # [H,W,C]
+        img = img_tensor[i].permute(1,2,0).detach().cpu().numpy()  # [H,W,C]
         img = ((img + 1)/2 * 255).astype(np.uint8)       # falls [-1,1] -> [0,255]
 
         dets = detector(img, 1)
