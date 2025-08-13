@@ -551,7 +551,11 @@ class Generator(torch.nn.Module):
         ws = self.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         ws2 = self.mapping2(z2, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         
-        ws_combined = (ws + ws2) / 2
+        #ws_combined = (ws + ws2) / 2
+        num_layers = ws.shape[1]
+        split_point = num_layers // 2
+        ws_combined = torch.cat([ws[:, :split_point, :], ws2[:, split_point:, :]], dim=1)
+
         img = self.synthesis(ws_combined, update_emas=update_emas, **synthesis_kwargs)
         return img
 

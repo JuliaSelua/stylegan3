@@ -23,7 +23,7 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -66,6 +66,7 @@ class StyleGAN2Loss(Loss):
         return logits
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
+        lambda_id = 0.1
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -73,17 +74,34 @@ class StyleGAN2Loss(Loss):
             phase = {'Dreg': 'none', 'Dboth': 'Dmain'}.get(phase, phase)
         blur_sigma = max(1 - cur_nimg / (self.blur_fade_kimg * 1e3), 0) * self.blur_init_sigma if self.blur_fade_kimg > 0 else 0
 
-        # Gmain: Maximize logits for generated images.
+        # Gmain: Maximize logits for generated images + identity loss (as mse)
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
-                gen_img, _gen_ws = self.run_G(gen_z, gen_z2, gen_c)
+                gen_img, _gen_ws = self.run_G(gen_z, gen_z2, gen_c)             #Generator Forward for whole batch
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
-                training_stats.report('Loss/scores/fake', gen_logits)
+                training_stats.report('Loss/scores/fake', gen_logits)           #GAN loss 
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
                 training_stats.report('Loss/G/loss', loss_Gmain)
+                total_G = loss_Gmain.mean() 
+
+                if getattr(self, 'use_id_loss', True):
+                    B = gen_img.shape[0] 
+                    B_even = B - (B % 2)
+                    if B_even >= 2:
+                        img_pair = gen_img[:B_even]              # [B_even, C, H, W]
+                        img_a = img_pair[0::2]                   # [B_even/2, C, H, W]
+                        img_b = img_pair[1::2]                   # [B_even/2, C, H, W]
+
+                        # MSE on images of same id
+                        id_mse = torch.nn.functional.mse_loss(img_a, img_b)
+
+                        training_stats.report('Loss/ID/mse', id_mse)
+                        total_G = total_G + self.id_loss_weight * id_mse
+                    else:
+                        pass
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                loss_Gmain.mean().mul(gain).backward()
+                total_G.mean().mul(gain).backward()
 
         # Gpl: Apply path length regularization.
         if phase in ['Greg', 'Gboth']:
