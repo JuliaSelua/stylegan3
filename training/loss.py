@@ -14,6 +14,21 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 
+from facenet_pytorch import InceptionResnetV1
+import torch.nn.functional as F
+
+facenet_model = InceptionResnetV1(pretrained='vggface2').eval().cuda()
+
+@torch.no_grad()
+def get_face_embedding(img):
+    """
+    img: Tensor in [-1, 1], shape [B, 3, H, W]
+    """
+    img_rescaled = (img + 1) / 2  # -> [0,1]
+    img_resized = F.interpolate(img_rescaled, size=(160, 160), mode='bilinear', align_corners=False)
+    emb = facenet_model(img_resized)
+    return F.normalize(emb, p=2, dim=1)
+
 #----------------------------------------------------------------------------
 
 class Loss:
@@ -81,27 +96,23 @@ class StyleGAN2Loss(Loss):
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 training_stats.report('Loss/scores/fake', gen_logits)           #GAN loss 
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
+
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
-                training_stats.report('Loss/G/loss', loss_Gmain)
-                total_G = loss_Gmain.mean() 
 
+                # ID loss auf Bildpaaren
                 if getattr(self, 'use_id_loss', True):
-                    B = gen_img.shape[0] 
-                    B_even = B - (B % 2)
-                    if B_even >= 2:
-                        img_pair = gen_img[:B_even]              # [B_even, C, H, W]
-                        img_a = img_pair[0::2]                   # [B_even/2, C, H, W]
-                        img_b = img_pair[1::2]                   # [B_even/2, C, H, W]
+                    # gen_img: [batch_size, C, H, W], 2 img /id
+                    emb = get_face_embedding(gen_img)  # e.g(batch_size, embedding_dim)
+                    emb_a = emb[0::2]  # even index: first image of pair
+                    emb_b = emb[1::2]  # odd idx: second image of pair
+                    # Cosine similarity: 1 - cos(emb_a, emb_b)
+                    id_loss = (1 - (emb_a * emb_b).sum(dim=1)).mean()
 
-                        # MSE on images of same id
-                        id_mse = torch.nn.functional.mse_loss(img_a, img_b)
+                    training_stats.report('Loss/G/id_loss', id_loss)
+                    loss_Gmain = loss_Gmain + lambda_id * id_loss
 
-                        training_stats.report('Loss/ID/mse', id_mse)
-                        total_G = total_G + self.id_loss_weight * id_mse
-                    else:
-                        pass
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                total_G.mean().mul(gain).backward()
+                loss_Gmain.mean().mul(gain).backward()
 
         # Gpl: Apply path length regularization.
         if phase in ['Greg', 'Gboth']:
