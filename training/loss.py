@@ -19,6 +19,8 @@ import cv2
 import torch
 import numpy as np
 
+import lpips
+
 detector = dlib.get_frontal_face_detector()
 sp = dlib.shape_predictor("shape_predictor_5_face_landmarks.dat")
 facerec = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
@@ -30,10 +32,13 @@ def dlib_get_face_embedding(img_tensor):
     """
     batch_size = img_tensor.shape[0]
     embeddings = []
-    
+
+    if img_tensor.min() < 0:
+        img_tensor = (img_tensor + 1) / 2
+
     for i in range(batch_size):
         img = img_tensor[i].permute(1,2,0).detach()  # [H,W,C]
-        img_np = ((img + 1) / 2 * 255).cpu().numpy().astype(np.uint8)
+        img_np = (img * 255).cpu().numpy().astype(np.uint8) 
 
         dets = detector(img_np, 1)
         if len(dets) == 0:
@@ -41,10 +46,20 @@ def dlib_get_face_embedding(img_tensor):
             continue
         
         shape = sp(img_np, dets[0])
-        face_descriptor = facerec.compute_face_descriptor(img_np, shape)
+        face_descriptor = np.array(facerec.compute_face_descriptor(img_np, shape))
         embeddings.append(torch.tensor(face_descriptor, dtype=torch.float32, device=img_tensor.device))
     
     return torch.stack(embeddings)
+
+#----------------------------------------------------------------------------
+lpips_alex = lpips.LPIPS(net='alex').cuda()
+
+def style_divergence_loss(img1, img2):
+    """
+    LPIPS-based Style-Loss btw img1 and img2.
+    img1, img2: Tensors [B,3,H,W] in [-1,1]
+    """
+    return lpips_alex(img1, img2).mean()
 
 #----------------------------------------------------------------------------
 
@@ -55,7 +70,7 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss = True):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -70,6 +85,8 @@ class StyleGAN2Loss(Loss):
         self.pl_mean            = torch.zeros([], device=device)
         self.blur_init_sigma    = blur_init_sigma
         self.blur_fade_kimg     = blur_fade_kimg
+        self.use_id_loss        = use_id_loss
+        self.use_style_loss     = use_style_loss
 
     def run_G(self, z, z2, c, update_emas=False):
         ws = self.G.mapping(z, c, update_emas=update_emas)
@@ -99,6 +116,7 @@ class StyleGAN2Loss(Loss):
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
         lambda_id = 0.1
+        lambda_style = 0.1
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -127,6 +145,13 @@ class StyleGAN2Loss(Loss):
 
                     training_stats.report('Loss/G/id_loss', id_loss)
                     loss_Gmain = loss_Gmain + lambda_id * id_loss
+                
+                if getattr(self, 'use_style_loss', True):
+                    img_a = gen_img[0::2] 
+                    img_b = gen_img[1::2]  
+                    style_loss = style_divergence_loss(img_a, img_b)  # LPIPS Loss
+                    training_stats.report('Loss/G/style_loss', style_loss)
+                    loss_Gmain = loss_Gmain + lambda_style * style_loss
 
             with torch.autograd.profiler.record_function('Gmain_backward'):
                 loss_Gmain.mean().mul(gain).backward()
