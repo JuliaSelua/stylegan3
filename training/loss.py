@@ -14,20 +14,37 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 
-from facenet_pytorch import InceptionResnetV1
-import torch.nn.functional as F
+import dlib
+import cv2
+import torch
+import numpy as np
 
-facenet_model = InceptionResnetV1(pretrained='vggface2').eval().cuda()
+detector = dlib.get_frontal_face_detector()
+sp = dlib.shape_predictor("shape_predictor_5_face_landmarks.dat")
+facerec = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
 
-@torch.no_grad()
-def get_face_embedding(img):
+def dlib_get_face_embedding(img_tensor):
     """
-    img: Tensor in [-1, 1], shape [B, 3, H, W]
+    img_tensor: torch.Tensor [B, C, H, W], Values in [0,1] or [-1,1]
+    return: torch.Tensor [B, 128] Embeddings
     """
-    img_rescaled = (img + 1) / 2  # -> [0,1]
-    img_resized = F.interpolate(img_rescaled, size=(160, 160), mode='bilinear', align_corners=False)
-    emb = facenet_model(img_resized)
-    return F.normalize(emb, p=2, dim=1)
+    batch_size = img_tensor.shape[0]
+    embeddings = []
+    
+    for i in range(batch_size):
+        img = img_tensor[i].permute(1,2,0).cpu().numpy()  # [H,W,C]
+        img = ((img + 1)/2 * 255).astype(np.uint8)       # falls [-1,1] -> [0,255]
+
+        dets = detector(img, 1)
+        if len(dets) == 0:
+            embeddings.append(np.zeros(128, dtype=np.float32))
+            continue
+        
+        shape = sp(img, dets[0])
+        face_descriptor = facerec.compute_face_descriptor(img, shape)
+        embeddings.append(np.array(face_descriptor, dtype=np.float32))
+    
+    return torch.tensor(embeddings, device=img_tensor.device)
 
 #----------------------------------------------------------------------------
 
@@ -99,10 +116,10 @@ class StyleGAN2Loss(Loss):
 
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
 
-                # ID loss auf Bildpaaren
+                # ID loss on pairs
                 if getattr(self, 'use_id_loss', True):
                     # gen_img: [batch_size, C, H, W], 2 img /id
-                    emb = get_face_embedding(gen_img)  # e.g(batch_size, embedding_dim)
+                    emb = dlib_get_face_embedding(gen_img)  # e.g(batch_size, embedding_dim)
                     emb_a = emb[0::2]  # even index: first image of pair
                     emb_b = emb[1::2]  # odd idx: second image of pair
                     # Cosine similarity: 1 - cos(emb_a, emb_b)
