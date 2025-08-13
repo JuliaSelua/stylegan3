@@ -32,19 +32,20 @@ def dlib_get_face_embedding(img_tensor):
     embeddings = []
     
     for i in range(batch_size):
-        img = img_tensor[i].permute(1,2,0).detach().cpu().numpy()  # [H,W,C]
-        img = ((img + 1)/2 * 255).astype(np.uint8)       # falls [-1,1] -> [0,255]
+        img = img_tensor[i].permute(1,2,0).detach()  # [H,W,C]
+        img_uint8 = ((img + 1)/2 * 255).to(torch.uint8)        # falls [-1,1] -> [0,255]
+        img_np = img_uint8.cpu().numpy()
 
         dets = detector(img, 1)
         if len(dets) == 0:
-            embeddings.append(np.zeros(128, dtype=np.float32))
+            embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
             continue
         
         shape = sp(img, dets[0])
-        face_descriptor = facerec.compute_face_descriptor(img, shape)
-        embeddings.append(np.array(face_descriptor, dtype=np.float32))
+        face_descriptor = facerec.compute_face_descriptor(img_np, shape)
+        embeddings.append(torch.tensor(face_descriptor, dtype=torch.float32, device=img_tensor.device))
     
-    return torch.tensor(embeddings, device=img_tensor.device)
+    return torch.stack(embeddings)
 
 #----------------------------------------------------------------------------
 
