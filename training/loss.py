@@ -35,7 +35,7 @@ def dlib_get_face_embedding(img_tensor):
         img = img_tensor[i].permute(1,2,0).detach()  # [H,W,C]
         img_np = ((img + 1) / 2 * 255).cpu().numpy().astype(np.uint8)
 
-        dets = detector(img, 1)
+        dets = detector(img_np, 1)
         if len(dets) == 0:
             embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
             continue
