@@ -33,23 +33,36 @@ def dlib_get_face_embedding(img_tensor):
     batch_size = img_tensor.shape[0]
     embeddings = []
 
+    # scale values
     if img_tensor.min() < 0:
         img_tensor = (img_tensor + 1) / 2
 
     for i in range(batch_size):
-        img = img_tensor[i].permute(1,2,0).detach()  # [H,W,C]
-        img_np = (img * 255).cpu().numpy().astype(np.uint8) 
+        # Tensor -> NumPy (uint8, RGB)
+        img = img_tensor[i].permute(1, 2, 0).detach().cpu().numpy()
+        img_np = np.clip(img * 255, 0, 255).astype(np.uint8)
 
+        # face recogn.
         dets = detector(img_np, 1)
         if len(dets) == 0:
             embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
             continue
-        
+
         shape = sp(img_np, dets[0])
-        face_descriptor = np.array(facerec.compute_face_descriptor(img_np, shape),  dtype=np.float32)
+
+        try:
+            face_descriptor = facerec.compute_face_descriptor(img_np, shape, num_jitters=0)
+        except Exception as e:
+            print(f"[WARN] compute_face_descriptor failed on image {i}: {e}")
+            embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
+            continue
+
+        # convert to tensor
+        face_descriptor = np.array(face_descriptor, dtype=np.float32)
         embeddings.append(torch.tensor(face_descriptor, dtype=torch.float32, device=img_tensor.device))
-    
+
     return torch.stack(embeddings)
+
 
 #----------------------------------------------------------------------------
 lpips_alex = lpips.LPIPS(net='alex').cuda()
