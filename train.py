@@ -239,6 +239,13 @@ def main(**kwargs):
         c.G_reg_interval = 4 # Enable lazy regularization for G.
         c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
         c.loss_kwargs.pl_no_weight_grad = True # Speed up path length regularization by skipping gradient computation wrt. conv2d weights.
+    elif opts.cfg == 'baseline':
+        c.G_kwargs.class_name = 'training.networks_stylegan2.BaselineGenerator'
+        c.loss_kwargs.style_mixing_prob = 0.9 # Enable style mixing regularization.
+        c.loss_kwargs.pl_weight = 2 # Enable path length regularization.
+        c.G_reg_interval = 4 # Enable lazy regularization for G.
+        c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
+        c.loss_kwargs.pl_no_weight_grad = True # Speed up path length regularization by skipping gradient computation wrt. conv2d weights.
     else:
         c.G_kwargs.class_name = 'training.networks_stylegan3.Generator'
         c.G_kwargs.magnitude_ema_beta = 0.5 ** (c.batch_size / (20 * 1e3))

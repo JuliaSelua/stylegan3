@@ -561,6 +561,37 @@ class Generator(torch.nn.Module):
 
 #----------------------------------------------------------------------------
 
+# Baseline Generator
+@persistence.persistent_class
+class BaselineGenerator(torch.nn.Module):
+    def __init__(self, z_dim, w_dim, img_resolution, img_channels, mapping_kwargs={}, synthesis_kwargs={}):
+        super().__init__()
+        self.z_dim = z_dim
+        self.w_dim = w_dim
+        self.img_resolution = img_resolution
+        self.img_channels = img_channels
+
+        self.mapping = MappingNetwork(z_dim=z_dim, c_dim=0, w_dim=w_dim, **mapping_kwargs)
+        self.mapping2 = MappingNetwork(z_dim=z_dim, c_dim=0, w_dim=w_dim, **mapping_kwargs)
+
+        self.synthesis = SynthesisNetwork(w_dim=w_dim, img_resolution=img_resolution,
+                                          img_channels=img_channels, **synthesis_kwargs)
+
+        self.num_ws = self.synthesis.num_ws
+
+    def forward(self, z_id, z_style=None, truncation_psi=1.0, truncation_cutoff=None):
+        if z_style is None:
+            z_style = z_id
+        ws_id = self.mapping(z_id, None, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        ws_style = self.mapping2(z_style, None, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        num_layers = ws_id.shape[1]
+        split = num_layers // 2
+        ws_combined = torch.cat([ws_id[:, :split, :], ws_style[:, split:, :]], dim=1)
+        img = self.synthesis(ws_combined)
+        return img
+
+#----------------------------------------------------------------------------
+
 @persistence.persistent_class
 class DiscriminatorBlock(torch.nn.Module):
     def __init__(self,
