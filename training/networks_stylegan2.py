@@ -564,7 +564,16 @@ class Generator(torch.nn.Module):
 # Baseline Generator
 @persistence.persistent_class
 class BaselineGenerator(torch.nn.Module):
-    def __init__(self, z_dim, w_dim, img_resolution, img_channels, mapping_kwargs={}, synthesis_kwargs={}):
+    #def __init__(self, z_dim, w_dim, img_resolution, img_channels, mapping_kwargs={}, synthesis_kwargs={}):
+    def __init__(self,
+        z_dim,                      # Input latent (Z) dimensionality.
+        c_dim,                      # Conditioning label (C) dimensionality.
+        w_dim,                      # Intermediate latent (W) dimensionality.
+        img_resolution,             # Output resolution.
+        img_channels,               # Number of output color channels.
+        mapping_kwargs      = {},   # Arguments for MappingNetwork.
+        **synthesis_kwargs,         # Arguments for SynthesisNetwork.
+    ):
         super().__init__()
         self.z_dim = z_dim
         self.w_dim = w_dim
