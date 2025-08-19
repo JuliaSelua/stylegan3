@@ -579,6 +579,7 @@ class BaselineGenerator(torch.nn.Module):
         self.w_dim = w_dim
         self.img_resolution = img_resolution
         self.img_channels = img_channels
+        self.c_dim = 0
         
         self.synthesis = SynthesisNetwork(w_dim=w_dim, img_resolution=img_resolution,
                                           img_channels=img_channels, **synthesis_kwargs)
