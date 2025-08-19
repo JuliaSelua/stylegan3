@@ -579,14 +579,15 @@ class BaselineGenerator(torch.nn.Module):
         self.w_dim = w_dim
         self.img_resolution = img_resolution
         self.img_channels = img_channels
+        
+        self.synthesis = SynthesisNetwork(w_dim=w_dim, img_resolution=img_resolution,
+                                          img_channels=img_channels, **synthesis_kwargs)
         self.num_ws = self.synthesis.num_ws
 
 
         self.mapping = MappingNetwork(z_dim=z_dim, c_dim=0, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
         self.mapping2 = MappingNetwork(z_dim=z_dim, c_dim=0, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
 
-        self.synthesis = SynthesisNetwork(w_dim=w_dim, img_resolution=img_resolution,
-                                          img_channels=img_channels, **synthesis_kwargs)
 
 
     def forward(self, z_id, z_style=None, truncation_psi=1.0, truncation_cutoff=None):
