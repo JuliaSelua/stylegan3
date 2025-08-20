@@ -560,7 +560,7 @@ class Generator(torch.nn.Module):
         return img
 
 #----------------------------------------------------------------------------
-
+'''
 # Baseline Generator
 @persistence.persistent_class
 class BaselineGenerator(torch.nn.Module):
@@ -601,7 +601,7 @@ class BaselineGenerator(torch.nn.Module):
         ws_combined = torch.cat([ws_id[:, :split, :], ws_style[:, split:, :]], dim=1)
         img = self.synthesis(ws_combined)
         return img
-
+'''
 #----------------------------------------------------------------------------
 
 @persistence.persistent_class

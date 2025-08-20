@@ -193,8 +193,8 @@ def main(**kwargs):
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
     if opts.cfg == 'stylegan2':
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_style_loss=True)
-    elif opts.cfg == 'stylegan2':
-        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_style_loss=True)
+    elif opts.cfg == 'baseline':
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_style_loss=False)
     else:
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
 
@@ -217,7 +217,7 @@ def main(**kwargs):
     c.D_kwargs.block_kwargs.freeze_layers = opts.freezed
     c.D_kwargs.epilogue_kwargs.mbstd_group_size = opts.mbstd_group
     c.loss_kwargs.r1_gamma = opts.gamma
-    c.G_opt_kwargs.lr = (0.002 if opts.cfg == 'stylegan2' else 0.0025) if opts.glr is None else opts.glr
+    c.G_opt_kwargs.lr = (0.002 if (opts.cfg == 'stylegan2') or (opts.cfg == 'baseline')  else 0.0025) if opts.glr is None else opts.glr
     c.D_opt_kwargs.lr = opts.dlr
     c.metrics = opts.metrics
     c.total_kimg = opts.kimg
