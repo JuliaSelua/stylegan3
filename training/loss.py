@@ -65,13 +65,16 @@ def dlib_get_face_embedding(img_tensor):
 
 
 #----------------------------------------------------------------------------
-lpips_alex = lpips.LPIPS(net='alex').cuda()
+lpips_alex = lpips.LPIPS(net='alex').eval().to(torch.cuda.current_device())
 
 def style_divergence_loss(img1, img2):
     """
     LPIPS-based Style-Loss btw img1 and img2.
     img1, img2: Tensors [B,3,H,W] in [-1,1]
     """
+    device = torch.cuda.current_device()
+    img1 = img1.to(device)
+    img2 = img2.to(device)
     return lpips_alex(img1, img2).mean()
 
 #----------------------------------------------------------------------------
