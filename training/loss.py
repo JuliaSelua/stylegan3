@@ -67,15 +67,25 @@ def dlib_get_face_embedding(img_tensor):
 #----------------------------------------------------------------------------
 lpips_alex = lpips.LPIPS(net='alex').eval().to(torch.cuda.current_device())
 
-def style_divergence_loss(img1, img2):
+#def style_divergence_loss(img1, img2):
     """
     LPIPS-based Style-Loss btw img1 and img2.
     img1, img2: Tensors [B,3,H,W] in [-1,1]
     """
-    device = torch.cuda.current_device()
-    img1 = img1.to(device)
-    img2 = img2.to(device)
-    return lpips_alex(img1, img2).mean()
+ #   device = torch.cuda.current_device()
+  #  img1 = img1.to(device)
+   # img2 = img2.to(device)
+    #return lpips_alex(img1, img2).mean()
+#Multi GPUs
+class StyleLossHelper:
+    def __init__(self, device):
+        self.lpips_alex = lpips.LPIPS(net='alex').eval().to(device)
+
+    def __call__(self, img1, img2):
+        device = next(self.lpips_alex.parameters()).device
+        img1 = img1.to(device)
+        img2 = img2.to(device)
+        return self.lpips_alex(img1, img2).mean()
 
 #----------------------------------------------------------------------------
 
@@ -103,6 +113,8 @@ class StyleGAN2Loss(Loss):
         self.blur_fade_kimg     = blur_fade_kimg
         self.use_id_loss        = use_id_loss
         self.use_style_loss     = use_style_loss
+        self.style_loss_fn      = StyleLossHelper(device)
+
 
     def run_G(self, z, z2, c, update_emas=False):
         ws = self.G.mapping(z, c, update_emas=update_emas)
@@ -165,7 +177,8 @@ class StyleGAN2Loss(Loss):
                 if getattr(self, 'use_style_loss', True):
                     img_a = gen_img[0::2] 
                     img_b = gen_img[1::2]  
-                    style_loss = style_divergence_loss(img_a, img_b)  # LPIPS Loss
+                    #style_loss = style_divergence_loss(img_a, img_b)  # LPIPS Loss
+                    style_loss = self.style_loss_fn(img_a, img_b)
                     training_stats.report('Loss/G/style_loss', style_loss)
                     loss_Gmain = loss_Gmain + lambda_style * style_loss
 
