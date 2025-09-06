@@ -545,16 +545,17 @@ class Generator(torch.nn.Module):
         self.mapping = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
         self.mapping2 = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
 
-    def forward(self, z, c, z2=None, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
+    def forward(self, z, c, z2=None, alpha=0.5, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
         if z2 is None:
             z2 = z
         ws = self.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         ws2 = self.mapping2(z2, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-        
+
+        ws_combined = alpha * ws + (1 - alpha) * ws2
         #ws_combined = (ws + ws2) / 2
-        num_layers = ws.shape[1]
-        split_point = num_layers // 2
-        ws_combined = torch.cat([ws[:, :split_point, :], ws2[:, split_point:, :]], dim=1)
+        #num_layers = ws.shape[1]
+        #split_point = num_layers // 2
+        #ws_combined = torch.cat([ws[:, :split_point, :], ws2[:, split_point:, :]], dim=1)
 
         img = self.synthesis(ws_combined, update_emas=update_emas, **synthesis_kwargs)
         return img
