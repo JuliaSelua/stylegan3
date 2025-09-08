@@ -578,6 +578,8 @@ class Generator(torch.nn.Module):
         self.w_dim_style = w_dim_style
         self.img_resolution = img_resolution
         self.img_channels = img_channels
+        synthesis_kwargs = dict(synthesis_kwargs)
+        synthesis_kwargs.pop("w_dim", None)
         
         self.synthesis = SynthesisNetwork(
             img_resolution=img_resolution,
