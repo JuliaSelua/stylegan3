@@ -163,9 +163,12 @@ def training_loop(
 
     # Print network summary tables.
     if rank == 0:
-        z = torch.empty([batch_gpu, G.z_dim], device=device)
+        #z = torch.empty([batch_gpu, G.z_dim], device=device)
+        z_id = torch.empty([batch_gpu, G.z_dim_id], device=device)
+        z_style = torch.empty([batch_gpu, G.z_dim_style], device=device)
         c = torch.empty([batch_gpu, G.c_dim], device=device)
-        img = misc.print_module_summary(G, [z, c])
+        #img = misc.print_module_summary(G, [z, c])
+        img = misc.print_module_summary(G, [z_id, z_style, c])
         misc.print_module_summary(D, [img, c])
 
     # Setup augmentation.
@@ -219,9 +222,15 @@ def training_loop(
         print('Exporting sample images...')
         grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
         save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
-        grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
+        grid_z_id = torch.randn([labels.shape[0], G.z_dim_id], device=device).split(batch_gpu)
+        grid_z_style = torch.randn([labels.shape[0], G.z_dim_style], device=device).split(batch_gpu)
+        #grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
         grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
-        images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
+        images = torch.cat([
+            G_ema(z_id=z_id, z_style=z_style, c=c, noise_mode='const').cpu()
+            for z_id, z_style, c in zip(grid_z_id, grid_z_style, grid_c)
+        ]).numpy()
+        #images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
         save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
 
     # Initialize logs.
@@ -265,9 +274,9 @@ def training_loop(
             #num_identities = (len(phases) * batch_size) 
             num_identities = batch_size // 2
 
-            z_id_unique = torch.randn([num_identities, G.z_dim], device=device) 
+            z_id_unique = torch.randn([num_identities, G.z_dim_id], device=device) 
             z_id = z_id_unique.repeat_interleave(2, dim=0) #twice the same id
-            z_style = torch.randn([batch_size, G.z_dim], device=device)#([len(phases) * batch_size, G.z_dim], device=device)
+            z_style = torch.randn([batch_size, G.z_dim_style], device=device)#([len(phases) * batch_size, G.z_dim], device=device)
 
             #all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in z_id.split(batch_size)]
             #all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in z_style.split(batch_size)]
@@ -367,7 +376,11 @@ def training_loop(
 
         # Save image snapshot.
         if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
-            images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
+            images = torch.cat([
+                G_ema(z_id=z_id, z_style=z_style, c=c, noise_mode='const').cpu()
+                for z_id, z_style, c in zip(grid_z_id, grid_z_style, grid_c)
+            ]).numpy()
+            #images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
             save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size)
 
         # Save network snapshot.
