@@ -589,9 +589,9 @@ class Generator(torch.nn.Module):
         )
         self.num_ws = self.synthesis.num_ws
         # Mapping Networks for ID and Style
-        self.mapping_id = MappingNetwork(z_dim=z_dim_id, c_dim=0, w_dim=w_dim_id, **mapping_kwargs)
-        self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, **mapping_kwargs)
-
+        self.mapping_id = MappingNetwork(z_dim=z_dim_id, c_dim=0, w_dim=w_dim_id, num_ws=self.num_ws, **mapping_kwargs)
+        self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, num_ws=self.num_ws, **mapping_kwargs)
+        
 
     def forward(self, z_id, z_style, truncation_psi=1, truncation_cutoff=None, update_emas=False):
         # Mapping in W space
