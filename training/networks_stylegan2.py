@@ -578,11 +578,6 @@ class Generator(torch.nn.Module):
         self.w_dim_style = w_dim_style
         self.img_resolution = img_resolution
         self.img_channels = img_channels
-
-        # Mapping Networks für ID und Style
-        self.mapping_id = MappingNetwork(z_dim=z_dim_id, c_dim=0, w_dim=w_dim_id, **mapping_kwargs)
-        self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, **mapping_kwargs)
-
         # Synthesis Network: concatenated ws
         self.synthesis = SynthesisNetwork(
             w_dim=w_dim_id + w_dim_style,
@@ -591,6 +586,10 @@ class Generator(torch.nn.Module):
             **synthesis_kwargs
         )
         self.num_ws = self.synthesis.num_ws
+        # Mapping Networks for ID and Style
+        self.mapping_id = MappingNetwork(z_dim=z_dim_id, c_dim=0, w_dim=w_dim_id, **mapping_kwargs)
+        self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, **mapping_kwargs)
+
 
     def forward(self, z_id, z_style, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
         # Mapping in W space
