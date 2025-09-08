@@ -524,7 +524,7 @@ class SynthesisNetwork(torch.nn.Module):
 #----------------------------------------------------------------------------
 
 @persistence.persistent_class
-class Generator(torch.nn.Module):
+class GeneratorOld(torch.nn.Module):
     def __init__(self,
         z_dim,                      # Input latent (Z) dimensionality.
         c_dim,                      # Conditioning label (C) dimensionality.
@@ -557,6 +557,52 @@ class Generator(torch.nn.Module):
         #split_point = num_layers // 2
         #ws_combined = torch.cat([ws[:, :split_point, :], ws2[:, split_point:, :]], dim=1)
 
+        img = self.synthesis(ws_combined, update_emas=update_emas, **synthesis_kwargs)
+        return img
+
+class Generator(torch.nn.Module):
+    def __init__(self,
+        z_dim_id,                  # ID latent dimension
+        z_dim_style,               # Style latent dimension
+        w_dim_id,                  # ID intermediate W dimension
+        w_dim_style,               # Style intermediate W dimension
+        img_resolution,
+        img_channels,
+        mapping_kwargs={},
+        **synthesis_kwargs,
+    ):
+        super().__init__()
+        self.z_dim_id = z_dim_id
+        self.z_dim_style = z_dim_style
+        self.w_dim_id = w_dim_id
+        self.w_dim_style = w_dim_style
+        self.img_resolution = img_resolution
+        self.img_channels = img_channels
+
+        # Mapping Networks für ID und Style
+        self.mapping_id = MappingNetwork(z_dim=z_dim_id, c_dim=0, w_dim=w_dim_id, **mapping_kwargs)
+        self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, **mapping_kwargs)
+
+        # Synthesis Network: concatenated ws
+        self.synthesis = SynthesisNetwork(
+            w_dim=w_dim_id + w_dim_style,
+            img_resolution=img_resolution,
+            img_channels=img_channels,
+            **synthesis_kwargs
+        )
+        self.num_ws = self.synthesis.num_ws
+
+    def forward(self, z_id, z_style, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
+        # Mapping in W space
+        ws_id = self.mapping_id(z_id, c=None, truncation_psi=truncation_psi,
+                                truncation_cutoff=truncation_cutoff, update_emas=update_emas)
+        ws_style = self.mapping_style(z_style, c=None, truncation_psi=truncation_psi,
+                                      truncation_cutoff=truncation_cutoff, update_emas=update_emas)
+
+        # Concatenate ID + Style subspaces
+        ws_combined = torch.cat([ws_id, ws_style], dim=2)  # dim=2 = feature dimension
+
+        # Generate image
         img = self.synthesis(ws_combined, update_emas=update_emas, **synthesis_kwargs)
         return img
 
