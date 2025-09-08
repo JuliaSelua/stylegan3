@@ -238,6 +238,10 @@ def main(**kwargs):
 
     # Base configuration.
     c.ema_kimg = c.batch_size * 10 / 32
+    c.G_kwargs.z_dim_id=256
+    c.G_kwargs.z_dim_style=256
+    c.G_kwargs.w_dim_id=256
+    c.G_kwargs.w_dim_style=256 
     if opts.cfg == 'stylegan2':
         c.G_kwargs.class_name = 'training.networks_stylegan2.Generator'
         c.loss_kwargs.style_mixing_prob = 0.9 # Enable style mixing regularization.
