@@ -578,11 +578,15 @@ class Generator(torch.nn.Module):
         self.w_dim_style = w_dim_style
         self.img_resolution = img_resolution
         self.img_channels = img_channels
+
+        synthesis_args = dict(synthesis_kwargs)
+        for bad in ('z_dim', 'z_dim_id', 'z_dim_style', 'c_dim', 'w_dim'):
+            synthesis_args.pop(bad, None)
         self.synthesis = SynthesisNetwork(
             img_resolution=img_resolution,
             img_channels=img_channels,
             w_dim=w_dim_id + w_dim_style,
-            **synthesis_kwargs
+            **synthesis_args
         )
         self.num_ws = self.synthesis.num_ws
         # Mapping Networks for ID and Style
