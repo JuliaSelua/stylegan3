@@ -578,15 +578,12 @@ class Generator(torch.nn.Module):
         self.w_dim_style = w_dim_style
         self.img_resolution = img_resolution
         self.img_channels = img_channels
-        # Synthesis Network: concatenated ws
-        allowed_keys = ['channel_base', 'channel_max', 'num_fp16_res', 'blur_filter']  # je nach Implementation anpassen
-        synthesis_args = {k: v for k, v in synthesis_kwargs.items() if k in allowed_keys}
-        synthesis_args['w_dim'] = w_dim_id + w_dim_style
+        
         self.synthesis = SynthesisNetwork(
-            #w_dim=w_dim_id + w_dim_style,
             img_resolution=img_resolution,
             img_channels=img_channels,
-            **synthesis_args
+            w_dim=w_dim_id + w_dim_style,
+            **synthesis_kwargs
         )
         self.num_ws = self.synthesis.num_ws
         # Mapping Networks for ID and Style
