@@ -127,7 +127,9 @@ class StyleGAN2Loss(Loss):
                 ws2[:, cutoff:] = self.G.mapping2(torch.randn_like(z2), c, update_emas=False)[:, cutoff:]
                 ws = (ws + ws2) / 2
         else:
-            ws = (ws + ws2) / 2
+            #ws = (ws + ws2) / 2
+            ws = torch.cat([ws_id[:, :ws_id.shape[1]//2, :], ws_style[:, ws_style.shape[1]//2:, :]], dim=1)
+
         img = self.G.synthesis(ws, update_emas=update_emas)
         return img, ws
 
