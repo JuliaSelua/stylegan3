@@ -579,9 +579,10 @@ class Generator(torch.nn.Module):
         self.img_resolution = img_resolution
         self.img_channels = img_channels
         # Synthesis Network: concatenated ws
+        synthesis_kwargs = dict(synthesis_kwargs)
         synthesis_kwargs.setdefault('w_dim', w_dim_id+w_dim_style)
         self.synthesis = SynthesisNetwork(
-            w_dim=w_dim_id + w_dim_style,
+            #w_dim=w_dim_id + w_dim_style,
             img_resolution=img_resolution,
             img_channels=img_channels,
             **synthesis_kwargs
