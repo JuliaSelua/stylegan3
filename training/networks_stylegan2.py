@@ -596,11 +596,11 @@ class Generator(torch.nn.Module):
         self.mapping_style = MappingNetwork(z_dim=z_dim_style, c_dim=0, w_dim=w_dim_style, num_ws=self.num_ws, **mapping_kwargs)
         
 
-    def forward(self, z_id, z_style, truncation_psi=1, truncation_cutoff=None, update_emas=False):
+    def forward(self, z_id, z_style, c, truncation_psi=1, truncation_cutoff=None, update_emas=False):
         # Mapping in W space
-        ws_id = self.mapping_id(z_id, c=None, truncation_psi=truncation_psi,
+        ws_id = self.mapping_id(z_id, c=c, truncation_psi=truncation_psi,
                                 truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-        ws_style = self.mapping_style(z_style, c=None, truncation_psi=truncation_psi,
+        ws_style = self.mapping_style(z_style, c=c, truncation_psi=truncation_psi,
                                       truncation_cutoff=truncation_cutoff, update_emas=update_emas)
 
         # Concatenate ID + Style subspaces
