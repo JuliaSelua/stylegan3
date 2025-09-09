@@ -564,6 +564,7 @@ class Generator(torch.nn.Module):
     def __init__(self,
         z_dim_id,                  # ID latent dimension
         z_dim_style,               # Style latent dimension
+        c_dim,
         w_dim_id,                  # ID intermediate W dimension
         w_dim_style,               # Style intermediate W dimension
         img_resolution,
@@ -574,6 +575,7 @@ class Generator(torch.nn.Module):
         super().__init__()
         self.z_dim_id = z_dim_id
         self.z_dim_style = z_dim_style
+        self.c_dim = c_dim
         self.w_dim_id = w_dim_id
         self.w_dim_style = w_dim_style
         self.img_resolution = img_resolution
