@@ -147,6 +147,16 @@ class FeatureStats:
         return obj
 
 #----------------------------------------------------------------------------
+class GeneratorAdapter(torch.nn.Module):
+    def __init__(self, G):
+        super().__init__()
+        self.G = G
+
+    def forward(self, z, c=None, **kwargs):
+        # z wird für ID und Style genutzt
+        z_id = z
+        z_style = z
+        return self.G(z_id=z_id, z_style=z_style, c=c, **kwargs)
 
 class ProgressMonitor:
     def __init__(self, tag=None, num_items=None, flush_interval=1000, verbose=False, progress_fn=None, pfn_lo=0, pfn_hi=1000, pfn_total=1000):
@@ -265,7 +275,13 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
         images = []
         for _i in range(batch_size // batch_gen):
             z = torch.randn([batch_gen, G.z_dim], device=opts.device)
-            img = G(z=z, c=next(c_iter), **opts.G_kwargs)
+            if hasattr(G, 'z_dim_id') and hasattr(G, 'z_dim_style'):
+                z_id = z[:, :G.z_dim_id]          
+                z_style = z[:, G.z_dim_id:]       
+                img = G(z_id=z_id, z_style=z_style, c=next(c_iter), **opts.G_kwargs)
+            else:
+                img = G(z=z, c=next(c_iter), **opts.G_kwargs)
+            #img = G(z=z, c=next(c_iter), **opts.G_kwargs)
             img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             images.append(img)
         images = torch.cat(images)
