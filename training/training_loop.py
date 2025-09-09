@@ -283,13 +283,13 @@ def training_loop(
             all_gen_z = [chunk for chunk in z_id.split(batch_gpu)]
             all_gen_z2 = [chunk for chunk in z_style.split(batch_gpu)]
             
-            #all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
-            #all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
-            #all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
+            all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
+            all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
+            all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
             
-            all_gen_c = torch.zeros([batch_size, G.c_dim], device=device) if G.c_dim > 0 else None
-            if all_gen_c is not None:
-                all_gen_c = [chunk for chunk in all_gen_c.split(batch_gpu)]
+            #all_gen_c = torch.zeros([batch_size, G.c_dim], device=device) if G.c_dim > 0 else None
+            #if all_gen_c is not None:
+            #    all_gen_c = [chunk for chunk in all_gen_c.split(batch_gpu)]
         # Execute training phases.
         for phase, phase_gen_z, phase_gen_z2, phase_gen_c in zip(phases, all_gen_z, all_gen_z2, all_gen_c):
             if batch_idx % phase.interval != 0:
