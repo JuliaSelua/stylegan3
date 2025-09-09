@@ -166,12 +166,7 @@ def training_loop(
         #z = torch.empty([batch_gpu, G.z_dim], device=device)
         z_id = torch.empty([batch_gpu, G.z_dim_id], device=device)
         z_style = torch.empty([batch_gpu, G.z_dim_style], device=device)
-        if hasattr(G, 'c_dim') and G.c_dim > 0:
-            c = torch.empty([batch_gpu, G.c_dim], device=device)
-        else:
-            c = None
-
-        #c = torch.empty([batch_gpu, G.c_dim], device=device)
+        c = torch.empty([batch_gpu, G.c_dim], device=device)
         #img = misc.print_module_summary(G, [z, c])
         img = misc.print_module_summary(G, [z_id, z_style, c])
         misc.print_module_summary(D, [img, c])
