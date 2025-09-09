@@ -32,10 +32,13 @@ def generate_images(network_pkl: str, seeds: tuple, n_styles: int, outdir: str):
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-        z_id = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+        #z_id = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+        z_id = torch.from_numpy(np.random.randn(1, G.z_dim_id)).to(device)
+
 
         for style_idx in range(n_styles):
-            z_style = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+            #z_style = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+            z_style = torch.from_numpy(np.random.randn(1, G.z_dim_style)).to(device)
 
             img = G(z_id, None, z2=z_style)
             img = (img.clamp(-1,1) + 1) * 127.5
