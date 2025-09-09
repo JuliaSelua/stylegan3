@@ -267,9 +267,9 @@ def training_loop(
             phase_real_img, phase_real_c = next(training_set_iterator)
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
-            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim_id], device=device)
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-            all_gen_z2 = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z2 = torch.randn([len(phases) * batch_size, G.z_dim_style], device=device)
             all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in all_gen_z2.split(batch_size)]
             #num_identities = (len(phases) * batch_size) 
             num_identities = batch_size // 2
