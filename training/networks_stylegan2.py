@@ -602,6 +602,8 @@ class Generator(torch.nn.Module):
                                 truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         ws_style = self.mapping_style(z_style, c=c, truncation_psi=truncation_psi,
                                       truncation_cutoff=truncation_cutoff, update_emas=update_emas)
+        print("ws_id", ws_id.shape)         # Erwartet [N, num_ws, w_dim_id]
+        print("ws_style", ws_style.shape)   # Erwartet [N, num_ws, w_dim_style]
 
         # Concatenate ID + Style subspaces
         ws_combined = torch.cat([ws_id, ws_style], dim=2)  # dim=2 = feature dimension
