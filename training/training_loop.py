@@ -267,10 +267,10 @@ def training_loop(
             phase_real_img, phase_real_c = next(training_set_iterator)
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
-            #all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-            #all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-            #all_gen_z2 = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-            #all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in all_gen_z2.split(batch_size)]
+            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+            all_gen_z2 = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in all_gen_z2.split(batch_size)]
             #num_identities = (len(phases) * batch_size) 
             num_identities = batch_size // 2
 
@@ -278,10 +278,10 @@ def training_loop(
             z_id = z_id_unique.repeat_interleave(2, dim=0) #twice the same id
             z_style = torch.randn([batch_size, G.z_dim_style], device=device)#([len(phases) * batch_size, G.z_dim], device=device)
 
-            #all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in z_id.split(batch_size)]
-            #all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in z_style.split(batch_size)]
-            all_gen_z = [chunk for chunk in z_id.split(batch_gpu)]
-            all_gen_z2 = [chunk for chunk in z_style.split(batch_gpu)]
+            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in z_id.split(batch_size)]
+            all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in z_style.split(batch_size)]
+            #all_gen_z = [chunk for chunk in z_id.split(batch_gpu)]
+            #all_gen_z2 = [chunk for chunk in z_style.split(batch_gpu)]
             
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
