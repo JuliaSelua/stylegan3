@@ -252,7 +252,7 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
     # Setup generator and labels.
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
     if not hasattr(G, 'forward_for_fid'):
-    raise RuntimeError("Generator must implement forward_for_fid() for FID evaluation.")
+        raise RuntimeError("Generator must implement forward_for_fid() for FID evaluation.")
 
     c_iter = iterate_random_labels(opts=opts, batch_size=batch_gen)
 
