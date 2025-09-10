@@ -425,12 +425,16 @@ def training_loop(
         #stats_dict = stats_collector.as_dict()
         # Collect statistics.
         for phase in phases:
-            value = 0.0
+            value = float('nan')  # default falls Events nicht aufgezeichnet wurden
             if (phase.start_event is not None) and (phase.end_event is not None):
-                # Sicherstellen, dass beide Events aufgezeichnet wurden
-                phase.start_event.synchronize()
-                phase.end_event.synchronize()
-                value = phase.start_event.elapsed_time(phase.end_event)
+                # Prüfen, ob Events tatsächlich auf GPU aufgezeichnet wurden
+                try:
+                    phase.start_event.synchronize()
+                    phase.end_event.synchronize()
+                    value = phase.start_event.elapsed_time(phase.end_event)
+                except RuntimeError:
+                    # Wenn ein Event noch nicht aufgenommen wurde, einfach überspringen
+                    value = float('nan')
             training_stats.report0('Timing/' + phase.name, value)
         stats_collector.update()
         stats_dict = stats_collector.as_dict()
