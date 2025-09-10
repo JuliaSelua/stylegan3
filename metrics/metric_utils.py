@@ -251,6 +251,9 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
 
     # Setup generator and labels.
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
+    if not hasattr(G, 'forward_for_fid'):
+    raise RuntimeError("Generator must implement forward_for_fid() for FID evaluation.")
+
     c_iter = iterate_random_labels(opts=opts, batch_size=batch_gen)
 
     # Initialize.
@@ -264,10 +267,10 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
         images = []
         for _i in range(batch_size // batch_gen):
             z = torch.randn([batch_gen, G.z_dim], device=opts.device)
-            if hasattr(G, 'forward_for_fid'):
-                img = G.forward_for_fid(z=z, c=next(c_iter), **opts.G_kwargs)
-            else:
-                img = G(z=z, c=next(c_iter), **opts.G_kwargs)
+            #if hasattr(G, 'forward_for_fid'):
+            img = G.forward_for_fid(z=z, c=next(c_iter), **opts.G_kwargs)
+            #else:
+                #img = G(z=z, c=next(c_iter), **opts.G_kwargs)
 
             #img = G(z=z, c=next(c_iter), **opts.G_kwargs)
             img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
