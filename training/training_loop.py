@@ -415,14 +415,26 @@ def training_loop(
         del snapshot_data # conserve memory
 
         # Collect statistics.
+        #for phase in phases:
+        #    value = []
+        #    if (phase.start_event is not None) and (phase.end_event is not None):
+        #        phase.end_event.synchronize()
+        #        value = phase.start_event.elapsed_time(phase.end_event)
+        #    training_stats.report0('Timing/' + phase.name, value)
+        #stats_collector.update()
+        #stats_dict = stats_collector.as_dict()
+        # Collect statistics.
         for phase in phases:
-            value = []
+            value = 0.0
             if (phase.start_event is not None) and (phase.end_event is not None):
+                # Sicherstellen, dass beide Events aufgezeichnet wurden
+                phase.start_event.synchronize()
                 phase.end_event.synchronize()
                 value = phase.start_event.elapsed_time(phase.end_event)
             training_stats.report0('Timing/' + phase.name, value)
         stats_collector.update()
         stats_dict = stats_collector.as_dict()
+
 
         # Update logs.
         timestamp = time.time()
