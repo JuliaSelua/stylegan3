@@ -616,6 +616,11 @@ class Generator(torch.nn.Module):
         img = self.synthesis(ws_combined, update_emas=update_emas, **synthesis_kwargs)
         return img
 
+        def forward_for_fid(self, z, c=None, truncation_psi=1, **kwargs):
+            z_id = z[:, :self.z_dim_id]
+            z_style = z[:, self.z_dim_id:]
+            return self.forward(z_id, z_style, c, truncation_psi=truncation_psi, **kwargs)
+
 #----------------------------------------------------------------------------
 '''
 # Baseline Generator
