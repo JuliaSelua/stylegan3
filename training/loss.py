@@ -128,7 +128,7 @@ class StyleGAN2Loss(Loss):
                 ws_combined = alpha * ws + (1 - alpha) * ws2
         else:
             ws_combined = alpha * ws + (1 - alpha) * ws2
-        img = self.G.synthesis(ws, update_emas=update_emas)
+        img = self.G.synthesis(ws_combined, update_emas=update_emas)
         return img, ws_combined
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
