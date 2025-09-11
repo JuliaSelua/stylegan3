@@ -423,20 +423,24 @@ def training_loop(
         #    training_stats.report0('Timing/' + phase.name, value)
         #stats_collector.update()
         #stats_dict = stats_collector.as_dict()
-        # Collect statistics.
         # Collect statistics
         for phase in phases:
-            value = float('nan')  # Standardwert, falls Events noch nicht aufgenommen wurden
-            if getattr(phase, "start_event", None) is not None and getattr(phase, "end_event", None) is not None:
-                if phase.start_event.query() and phase.end_event.query():
-                    phase.start_event.synchronize()
-                    phase.end_event.synchronize()
+            value = float('nan')  
+            start_event = getattr(phase, "start_event", None)
+            end_event = getattr(phase, "end_event", None)
+            
+            if start_event is not None and end_event is not None:
+                if getattr(start_event, "_has_recorded", False) and getattr(end_event, "_has_recorded", False):
+                    start_event.synchronize()
+                    end_event.synchronize()
                     torch.cuda.synchronize()
-                    value = phase.start_event.elapsed_time(phase.end_event)
+                    value = start_event.elapsed_time(end_event)
+            
             training_stats.report0('Timing/' + phase.name, value)
         
         stats_collector.update()
         stats_dict = stats_collector.as_dict()
+
 
         '''for phase in phases:
             value = float('nan')  # default falls Events nicht aufgezeichnet wurden
