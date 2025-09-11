@@ -132,15 +132,23 @@ class StyleGAN2Loss(Loss):
 
         img = self.G.synthesis(ws, update_emas=update_emas)
         return img, ws
+        
     def run_G(self, z, z2, c, update_emas=False):
-        img = self.G(z_id=z, z_style=z2, c=c, update_emas=update_emas)
-    
-        with torch.no_grad():
-            ws_id = self.G.mapping_id(z, c=c, update_emas=update_emas)
-            ws_style = self.G.mapping_style(z2, c=c, update_emas=update_emas)
-            ws_combined = torch.cat([ws_id, ws_style], dim=2)
-    
+        ws_id = self.G.mapping_id(z, c=c, update_emas=update_emas)
+        ws_style = self.G.mapping_style(z2, c=c, update_emas=update_emas)
+        ws_combined = torch.cat([ws_id, ws_style], dim=2)
+        if self.style_mixing_prob > 0:
+            cutoff = torch.randint(1, ws_combined.shape[1], [1], device=ws_combined.device)
+            ws_combined[:, cutoff:] = self.G.mapping_style(torch.randn_like(z2), c=c)[:, cutoff:]
+        img = self.G.synthesis(ws_combined, update_emas=update_emas)
         return img, ws_combined
+
+        #img = self.G(z_id=z, z_style=z2, c=c, update_emas=update_emas)
+        #with torch.no_grad():
+        #    ws_id = self.G.mapping_id(z, c=c, update_emas=update_emas)
+        #    ws_style = self.G.mapping_style(z2, c=c, update_emas=update_emas)
+        #    ws_combined = torch.cat([ws_id, ws_style], dim=2)
+        #return img, ws_combined
 
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
