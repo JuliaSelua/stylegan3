@@ -431,6 +431,7 @@ def training_loop(
                 try:
                     phase.start_event.synchronize()
                     phase.end_event.synchronize()
+                    torch.cuda.synchronize()
                     value = phase.start_event.elapsed_time(phase.end_event)
                 except RuntimeError:
                     # Wenn ein Event noch nicht aufgenommen wurde, einfach überspringen
