@@ -125,7 +125,7 @@ class StyleGAN2Loss(Loss):
                 cutoff = torch.where(torch.rand([], device=ws.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws.shape[1]))
                 ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
                 ws2[:, cutoff:] = self.G.mapping2(torch.randn_like(z2), c, update_emas=False)[:, cutoff:]
-                ws = (ws + ws2) / 2
+                ws_combined = alpha * ws + (1 - alpha) * ws2
         else:
             ws_combined = alpha * ws + (1 - alpha) * ws2
         img = self.G.synthesis(ws, update_emas=update_emas)
