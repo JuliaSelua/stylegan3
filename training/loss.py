@@ -153,13 +153,13 @@ class StyleGAN2Loss(Loss):
         img = self.G.synthesis(ws_combined, update_emas=update_emas)
         # after ws_id, ws_style, ws_combined created
         rank = 0
-        if torch.distributed.is_available() and torch.distributed.is_initialized():
-            rank = torch.distributed.get_rank()
-        
-        if rank == 0:
-            print(f"[DEBUG] gen_img shape: {gen_img.shape}, "
-                  f"range: {gen_img.min().item():.3f}..{gen_img.max().item():.3f}")
-            print(f"[DEBUG] _gen_ws shape: {_gen_ws.shape}")
+        # after ws_id, ws_style, ws_combined created
+        if (torch.distributed.is_available() 
+            and torch.distributed.is_initialized() 
+            and torch.distributed.get_rank() == 0) or not torch.distributed.is_available():
+            print(f"[DBG] ws_id.shape={tuple(ws_id.shape)}, ws_style.shape={tuple(ws_style.shape)}, ws_combined.shape={tuple(ws_combined.shape)}")
+            print(f"[DBG] G.synthesis.num_ws={self.G.synthesis.num_ws}, "
+                  f"G.synthesis.w_dim={getattr(self.G.synthesis, 'w_dim', 'NA')}")
 
         return img, ws_combined
 
