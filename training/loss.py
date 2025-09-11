@@ -143,6 +143,7 @@ class StyleGAN2Loss(Loss):
         ws_id = self.G.mapping_id(z, c=c, update_emas=update_emas)
         ws_style = self.G.mapping_style(z2, c=c, update_emas=update_emas)
         ws_combined = torch.cat([ws_id, ws_style], dim=2)
+
         if self.style_mixing_prob > 0:
             if torch.rand([]) < self.style_mixing_prob:
                 cutoff = torch.randint(1, ws_style.shape[1], [1], device=ws_style.device)  # Layer cutoff
@@ -150,6 +151,11 @@ class StyleGAN2Loss(Loss):
                 ws_combined[:, cutoff:] = torch.cat([ws_id[:, cutoff:], new_style[:, cutoff:]], dim=2)
 
         img = self.G.synthesis(ws_combined, update_emas=update_emas)
+        # after ws_id, ws_style, ws_combined created
+        if torch.distributed.get_rank() == 0 if hasattr(torch.distributed, 'get_rank') else True:
+            print(f"[DBG] ws_id.shape={tuple(ws_id.shape)}, ws_style.shape={tuple(ws_style.shape)}, ws_combined.shape={tuple(ws_combined.shape)}")
+            print(f"[DBG] G.synthesis.num_ws={self.G.synthesis.num_ws}, G.synthesis.w_dim={self.G.synthesis.w_dim if hasattr(self.G.synthesis, 'w_dim') else 'NA'}")
+
         return img, ws_combined
 
         #img = self.G(z_id=z, z_style=z2, c=c, update_emas=update_emas)
