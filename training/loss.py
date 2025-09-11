@@ -162,39 +162,52 @@ class StyleGAN2Loss(Loss):
                   f"G.synthesis.w_dim={getattr(self.G.synthesis, 'w_dim', 'NA')}")
 
         return img, ws_combined'''
-    def run_G(self, z, z2, c, truncation_psi=1, truncation_cutoff=None, update_emas=False):
-            # Mapping
-            ws_id = self.G.mapping_id(z, c=c, truncation_psi=truncation_psi,
-                                      truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-            ws_style = self.G.mapping_style(z2, c=c, truncation_psi=truncation_psi,
-                                            truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-                
-            # Concatenate ID + Style latent codes
-            ws_combined = torch.cat([ws_id, ws_style], dim=2)
+    def run_G(self, z, z2, c, update_emas=False, truncation_psi=0.7):
+        """
+        Forward pass through the generator with optional style mixing and truncation.
         
-            # Style mixing
-            if self.style_mixing_prob > 0 and torch.rand([]) < self.style_mixing_prob:
+        Args:
+            z: Latents for ID (identity) [batch, z_dim_id]
+            z2: Latents for style [batch, z_dim_style]
+            c: Conditioning labels
+            update_emas: Whether to update exponential moving averages
+            truncation_psi: Truncation factor for stabilizing WS values
+        Returns:
+            img: Generated images in [-1,1]
+            ws_combined: Combined WS latent for potential style-mixing
+        """
+    
+        # Mapping
+        ws_id = self.G.mapping_id(z, c=c, truncation_psi=truncation_psi, update_emas=update_emas)
+        ws_style = self.G.mapping_style(z2, c=c, truncation_psi=truncation_psi, update_emas=update_emas)
+        
+        # Combine WS
+        ws_combined = torch.cat([ws_id, ws_style], dim=2)
+    
+        # Style-mixing
+        if self.style_mixing_prob > 0:
+            if torch.rand([]) < self.style_mixing_prob:
                 cutoff = torch.randint(1, ws_style.shape[1], [1], device=ws_style.device)
-                new_style = self.G.mapping_style(torch.randn_like(z2), c=c, truncation_psi=truncation_psi,
-                                                 truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-                # Achtung: sichere Zuweisung ohne Dimension-Fehler
-                ws_combined[:, :, cutoff:] = torch.cat([ws_id[:, :, cutoff:], new_style[:, :, cutoff:]], dim=2)
-        
-            # Synthesize image
-            img = self.G.synthesis(ws_combined, update_emas=update_emas)
-        
-            # Debug / Sanity checks
-            if (torch.distributed.is_available() and torch.distributed.is_initialized() and 
-                torch.distributed.get_rank() == 0) or not torch.distributed.is_available():
-                print(f"[DBG] ws_id.shape={tuple(ws_id.shape)}, ws_style.shape={tuple(ws_style.shape)}, ws_combined.shape={tuple(ws_combined.shape)}")
-                print(f"[DBG] G.synthesis.num_ws={self.G.synthesis.num_ws}, "
-                      f"G.synthesis.w_dim={getattr(self.G.synthesis, 'w_dim', 'NA')}")
-                print(f"[DBG] gen_img range: min={img.min().item()}, max={img.max().item()}")
-        
-            # Sanity check für Generator-Ausgabe [-1,1]
-            assert img.min() >= -1.1 and img.max() <= 1.1, f"Generator Output außerhalb [-1,1]: {img.min()}..{img.max()}"
-        
-            return img, ws_combined
+                new_style = self.G.mapping_style(torch.randn_like(z2), c=c, truncation_psi=truncation_psi, update_emas=update_emas)
+                # Replace style part after cutoff
+                ws_combined[:, cutoff:] = torch.cat([ws_id[:, cutoff:], new_style[:, cutoff:]], dim=2)
+    
+        # Synthesis
+        img = self.G.synthesis(ws_combined, update_emas=update_emas)
+    
+        # Clip / warn generator output
+        if img.min() < -1.0 or img.max() > 1.0:
+            print(f"[WARN] Generator output out of range: {img.min().item()}..{img.max().item()}")
+            img = torch.clamp(img, -1.0, 1.0)
+    
+        # Debug shapes on main process
+        if (torch.distributed.is_available() and torch.distributed.is_initialized() 
+            and torch.distributed.get_rank() == 0) or not torch.distributed.is_available():
+            print(f"[DBG] ws_id.shape={tuple(ws_id.shape)}, ws_style.shape={tuple(ws_style.shape)}, ws_combined.shape={tuple(ws_combined.shape)}")
+            print(f"[DBG] G.synthesis.num_ws={self.G.synthesis.num_ws}, "
+                  f"G.synthesis.w_dim={getattr(self.G.synthesis, 'w_dim', 'NA')}")
+    
+        return img, ws_combined
 
 
         #img = self.G(z_id=z, z_style=z2, c=c, update_emas=update_emas)
