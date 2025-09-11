@@ -116,7 +116,7 @@ class StyleGAN2Loss(Loss):
         self.style_loss_fn      = StyleLossHelper(device)
 
 
-    def run_G(self, z, z2, c, update_emas=False):
+    def run_G(self, z, z2, c, alpha=0.5, update_emas=False):
         ws = self.G.mapping(z, c, update_emas=update_emas)
         ws2 = self.G.mapping2(z2, c, update_emas=update_emas) if z2 is not None else ws.clone()
         if self.style_mixing_prob > 0:
@@ -127,9 +127,9 @@ class StyleGAN2Loss(Loss):
                 ws2[:, cutoff:] = self.G.mapping2(torch.randn_like(z2), c, update_emas=False)[:, cutoff:]
                 ws = (ws + ws2) / 2
         else:
-            ws = (ws + ws2) / 2
+            ws_combined = alpha * ws + (1 - alpha) * ws2
         img = self.G.synthesis(ws, update_emas=update_emas)
-        return img, ws
+        return img, ws_combined
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
         blur_size = np.floor(blur_sigma * 3)
