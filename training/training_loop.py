@@ -424,7 +424,21 @@ def training_loop(
         #stats_collector.update()
         #stats_dict = stats_collector.as_dict()
         # Collect statistics.
+        # Collect statistics
         for phase in phases:
+            value = float('nan')  # Standardwert, falls Events noch nicht aufgenommen wurden
+            if getattr(phase, "start_event", None) is not None and getattr(phase, "end_event", None) is not None:
+                if phase.start_event.query() and phase.end_event.query():
+                    phase.start_event.synchronize()
+                    phase.end_event.synchronize()
+                    torch.cuda.synchronize()
+                    value = phase.start_event.elapsed_time(phase.end_event)
+            training_stats.report0('Timing/' + phase.name, value)
+        
+        stats_collector.update()
+        stats_dict = stats_collector.as_dict()
+
+        '''for phase in phases:
             value = float('nan')  # default falls Events nicht aufgezeichnet wurden
             if (phase.start_event is not None) and (phase.end_event is not None):
                 # Prüfen, ob Events tatsächlich auf GPU aufgezeichnet wurden
@@ -438,7 +452,7 @@ def training_loop(
                     value = float('nan')
             training_stats.report0('Timing/' + phase.name, value)
         stats_collector.update()
-        stats_dict = stats_collector.as_dict()
+        stats_dict = stats_collector.as_dict()'''
 
 
         # Update logs.
