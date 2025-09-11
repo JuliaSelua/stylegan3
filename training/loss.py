@@ -162,7 +162,7 @@ class StyleGAN2Loss(Loss):
                   f"G.synthesis.w_dim={getattr(self.G.synthesis, 'w_dim', 'NA')}")
 
         return img, ws_combined'''
-        def run_G(self, z, z2, c, truncation_psi=1, truncation_cutoff=None, update_emas=False):
+    def run_G(self, z, z2, c, truncation_psi=1, truncation_cutoff=None, update_emas=False):
             # Mapping
             ws_id = self.G.mapping_id(z, c=c, truncation_psi=truncation_psi,
                                       truncation_cutoff=truncation_cutoff, update_emas=update_emas)
