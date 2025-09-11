@@ -138,10 +138,10 @@ class StyleGAN2Loss(Loss):
         ws_style = self.G.mapping_style(z2, c=c, update_emas=update_emas)
         ws_combined = torch.cat([ws_id, ws_style], dim=2)
         if self.style_mixing_prob > 0:
-            cutoff = torch.randint(1, ws_style.shape[1], [1], device=ws_combined.device)
             if torch.rand([]) < self.style_mixing_prob:
+                cutoff = torch.randint(1, ws_style.shape[1], [1], device=ws_style.device)  # Layer cutoff
                 new_style = self.G.mapping_style(torch.randn_like(z2), c=c, update_emas=update_emas)
-                ws_combined[:, ws_id.shape[1]:, cutoff:] = new_style[:, :, cutoff:]
+                ws_combined[:, cutoff:] = torch.cat([ws_id[:, cutoff:], new_style[:, cutoff:]], dim=2)
 
         img = self.G.synthesis(ws_combined, update_emas=update_emas)
         return img, ws_combined
