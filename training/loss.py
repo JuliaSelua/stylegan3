@@ -114,6 +114,12 @@ class StyleGAN2Loss(Loss):
         self.use_id_loss        = use_id_loss
         self.use_style_loss     = use_style_loss
         self.style_loss_fn      = StyleLossHelper(device)
+        
+        self.style_mixing_prob = 0.0
+        self.use_id_loss = False
+        self.use_style_loss = False
+        lambda_id = 0.0
+        lambda_style = 0.0
 
 
     def run_Gold(self, z, z2, c, update_emas=False):
@@ -166,8 +172,8 @@ class StyleGAN2Loss(Loss):
         return logits
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
-        lambda_id = 0.1
-        lambda_style = 0.1
+        #lambda_id = 0.1
+        #lambda_style = 0.1
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
