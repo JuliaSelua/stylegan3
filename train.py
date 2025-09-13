@@ -194,7 +194,7 @@ def main(**kwargs):
     if opts.cfg == 'stylegan2':
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_style_loss=True)
     elif opts.cfg == 'baseline':
-        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_style_loss=False)
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_style_loss=False)
     else:
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
 
