@@ -45,9 +45,10 @@ def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
     img_tensor: torch.Tensor [B, C, H, W], already aligned+cropped to 112x112
     return: torch.Tensor [B, 512] embeddings
     """
-    if img_tensor.min() < 0:
-        img_tensor = (img_tensor + 1) / 2
-    img_tensor = img_tensor * 2 - 1  # ensure [-1,1] range
+    #if img_tensor.min() < 0:
+    #    img_tensor = (img_tensor + 1) / 2
+    #img_tensor = img_tensor * 2 - 1  # ensure [-1,1] range
+    img_tensor = img_tensor.to(device)  # assume already in [-1,1]
 
     with torch.no_grad():
         emb = backbone(img_tensor.to(device))
