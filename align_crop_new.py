@@ -25,17 +25,16 @@ def load_syn_paths(datadir, num_imgs=0):
 
 def load_real_paths(datadir, num_imgs=0):
     img_paths = []
-    for id in sorted(os.listdir(datadir)):
+    id_folders = sorted(os.listdir(datadir))
+    for id in id_folders:
         folder_path = os.path.join(datadir, id)
         if not os.path.isdir(folder_path):
-            continue  # skip non-folders like dataset.json
-        for f_name in sorted(os.listdir(folder_path)):
-            if f_name.lower().endswith(('.png', '.jpg', '.jpeg')):
-                img_paths.append(os.path.join(folder_path, f_name))
-    if num_imgs > 0:
-        img_paths = img_paths[:num_imgs]
+            continue  # skip files like dataset.json
+        img_files = sorted(os.listdir(folder_path))
+        img_paths += [os.path.join(folder_path, f_name) for f_name in img_files
+                      if f_name.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    img_paths = img_paths if num_imgs == 0 else img_paths[:num_imgs]
     return img_paths
-
 
 
 def is_folder_structure(datadir):
