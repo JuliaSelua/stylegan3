@@ -70,7 +70,7 @@ def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
             evalDB: evaluation DB alignment
     """
     os.makedirs(out_folder, exist_ok=True)
-    is_folder = false#is_folder_structure(in_folder)
+    is_folder = False#is_folder_structure(in_folder)
     train_dataset = InferenceDataset(
         in_folder, num_imgs=num_imgs, folder_structure=is_folder
     )
