@@ -113,7 +113,7 @@ def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
             warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
             cv2.imwrite(os.path.join(out_path, img_name), warped_face)
 
-    print("Skipped images:", skipped_imgs)
+  #  print("Skipped images:", skipped_imgs)
     print(f"Images with no Face: {len(skipped_imgs)}")
 
 # CLI
