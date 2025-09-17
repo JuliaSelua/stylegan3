@@ -95,6 +95,10 @@ def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
                 out_path = ojoin(out_folder, id_dir)
                 os.makedirs(out_path, exist_ok=True)
                 img_name = os.path.split(img_name)[1]
+            if landmark is None or not isinstance(landmark[0], (list, np.ndarray)):
+                skipped_imgs.append(img_name)
+                continue
+            facial5points = np.array(landmark[0], dtype=np.float32)
 
             facial5points = landmark[0]
             warped_face = norm_crop(
