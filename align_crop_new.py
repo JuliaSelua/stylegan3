@@ -127,7 +127,6 @@ def main():
     align_images(
         args.in_folder,
         args.out_folder,
-        args.batchsize,
         num_imgs=args.num_imgs,
         evalDB=args.evalDB == 1,
     )
