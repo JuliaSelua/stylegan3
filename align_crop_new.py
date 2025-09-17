@@ -21,22 +21,19 @@ def load_syn_paths(datadir, num_imgs=0):
 
 def load_real_paths(datadir, num_imgs=0):
     img_paths = []
-    id_folders = sorted(os.listdir(datadir))
+    id_folders = sorted(f for f in os.listdir(datadir) if os.path.isdir(ojoin(datadir, f)))
     for id in id_folders:
-        path_id = ojoin(datadir, id)
-        if not os.path.isdir(path_id):
-            continue
-        img_files = sorted(f for f in os.listdir(path_id) if f.lower().endswith(('.png', '.jpg', '.jpeg')))
-        img_paths += [ojoin(path_id, f_name) for f_name in img_files]
+        img_files = sorted(f for f in os.listdir(ojoin(datadir, id)) if f.lower().endswith(('.png', '.jpg', '.jpeg')))
+        img_paths += [ojoin(datadir, id, f_name) for f_name in img_files]
     img_paths = img_paths if num_imgs == 0 else img_paths[:num_imgs]
     return img_paths
 
 def is_folder_structure(datadir):
-    img_list = [f for f in os.listdir(datadir) if not f.startswith('.')]
-    if not img_list:
+    files = sorted(os.listdir(datadir))
+    if not files:
         return False
-    img_path = ojoin(datadir, img_list[0])
-    return os.path.isdir(img_path)
+    first_path = ojoin(datadir, files[0])
+    return os.path.isdir(first_path)
 
 class InferenceDataset(Dataset):
     def __init__(self, datadir, num_imgs=0, folder_structure=False):
@@ -69,28 +66,26 @@ def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
     for img_batch, img_names in tqdm(train_loader):
         valid_imgs = []
         valid_names = []
-
-        for img, name in zip(img_batch, img_names):
-            if img is None:
-                skipped_imgs.append(name)
+        for img, img_name in zip(img_batch, img_names):
+            if img is None or not isinstance(img, np.ndarray):
+                skipped_imgs.append(img_name)
                 continue
             valid_imgs.append(img)
-            valid_names.append(name)
-
+            valid_names.append(img_name)
         if len(valid_imgs) == 0:
             continue
 
-        img_tensor = np.stack([cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in valid_imgs])
-        img_tensor = img_tensor.transpose(0, 3, 1, 2) / 255.0
+        img_tensor_list = [cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in valid_imgs]
+        img_tensor = np.stack(img_tensor_list).transpose(0, 3, 1, 2) / 255.0
         img_tensor = torch.tensor(img_tensor, dtype=torch.float32, device="cuda:0")
 
+        # MTCNN detection
         boxes, probs, landmarks = mtcnn.detect(img_tensor, landmarks=True)
 
         for img, img_name, landmark in zip(valid_imgs, valid_names, landmarks):
-            if landmark is None or len(landmark) == 0:
+            if landmark is None or not isinstance(landmark[0], (list, np.ndarray)):
                 skipped_imgs.append(img_name)
                 continue
-
             out_path = out_folder
             if is_folder:
                 id_dir = os.path.split(img_name)[0]
@@ -98,17 +93,11 @@ def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
                 os.makedirs(out_path, exist_ok=True)
                 img_name = os.path.split(img_name)[1]
 
-            img = img.astype(np.float32)
             facial5points = np.array(landmark[0], dtype=np.float32)
+            warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
+            cv2.imwrite(os.path.join(out_path, img_name), warped_face)
 
-            try:
-                warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
-                cv2.imwrite(os.path.join(out_path, img_name), warped_face)
-            except Exception as e:
-                print(f"Skipping {img_name} due to error: {e}")
-                skipped_imgs.append(img_name)
-
-    print(skipped_imgs)
+    print("Skipped images:", skipped_imgs)
     print(f"Images with no Face: {len(skipped_imgs)}")
 
 def main():
@@ -119,14 +108,7 @@ def main():
     parser.add_argument("--evalDB", type=int, default=0, help="1 for eval DB alignment")
     parser.add_argument("--num_imgs", type=int, default=0, help="amount of images to align; 0 for all images")
     args = parser.parse_args()
-
-    align_images(
-        args.in_folder,
-        args.out_folder,
-        args.batchsize,
-        num_imgs=args.num_imgs,
-        evalDB=args.evalDB == 1,
-    )
+    align_images(args.in_folder, args.out_folder, args.batchsize, num_imgs=args.num_imgs, evalDB=args.evalDB == 1)
 
 if __name__ == "__main__":
     main()
