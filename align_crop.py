@@ -14,7 +14,7 @@ mtcnn = MTCNN(
 )
 
 def load_syn_paths(datadir, num_imgs=0):
-    img_files = sorted(os.listdir(datadir))
+    img_files = sorted(f for f in os.listdir(datadir) if f.lower().endswith(('.png', '.jpg', '.jpeg')))
     img_files = img_files if num_imgs == 0 else img_files[:num_imgs]
     return [ojoin(datadir, f_name) for f_name in img_files]
 
