@@ -4,6 +4,7 @@ from tqdm import tqdm
 import argparse
 from os.path import join as ojoin
 from torch.utils.data import Dataset, DataLoader
+import numpy as np
 
 from utils.align_trans import norm_crop
 
