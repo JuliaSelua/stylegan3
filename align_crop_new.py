@@ -24,23 +24,18 @@ def load_syn_paths(datadir, num_imgs=0):
     return [ojoin(datadir, f) for f in img_files]
 
 def load_real_paths(datadir, num_imgs=0):
-    """
-    Lädt alle Bilder aus verschachtelten Ordnern.
-    Gibt nur absolute Pfade zurück.
-    """
     img_paths = []
-    id_folders = sorted(os.listdir(datadir))
-    for id in id_folders:
+    for id in sorted(os.listdir(datadir)):
         folder_path = os.path.join(datadir, id)
         if not os.path.isdir(folder_path):
-            continue  # überspringt Dateien wie dataset.json
-        img_files = sorted(f for f in os.listdir(folder_path) if f.lower().endswith(('.png', '.jpg', '.jpeg')))
-        img_paths += [os.path.join(folder_path, f_name) for f_name in img_files]
-
+            continue  # skip non-folders like dataset.json
+        for f_name in sorted(os.listdir(folder_path)):
+            if f_name.lower().endswith(('.png', '.jpg', '.jpeg')):
+                img_paths.append(os.path.join(folder_path, f_name))
     if num_imgs > 0:
         img_paths = img_paths[:num_imgs]
-
     return img_paths
+
 
 
 def is_folder_structure(datadir):
