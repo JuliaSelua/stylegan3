@@ -14,54 +14,45 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 
-import dlib
 import cv2
 import torch
 import numpy as np
 
 import lpips
 
-detector = dlib.get_frontal_face_detector()
-sp = dlib.shape_predictor("shape_predictor_5_face_landmarks.dat")
-facerec = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
 
-def dlib_get_face_embedding(img_tensor):
-    """
-    img_tensor: torch.Tensor [B, C, H, W], Values in [0,1] or [-1,1]
-    return: torch.Tensor [B, 128] Embeddings
-    """
-    batch_size = img_tensor.shape[0]
-    embeddings = []
+import torch
+import torchvision.transforms as T
+from utils.iresnet import iresnet100
 
-    # scale values
+# Transform (für aligned Images)
+transform = T.Compose([
+    T.ToTensor(),
+    T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+])
+
+def load_elasticface(device="cuda:0"):
+    ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location=device)
+    backbone = iresnet100(num_features=512).to(device)
+    backbone.load_state_dict(ckpt)
+    backbone.eval()
+    return backbone
+
+backbone = load_elasticface()
+
+def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
+    """
+    img_tensor: torch.Tensor [B, C, H, W], already aligned+cropped to 112x112
+    return: torch.Tensor [B, 512] embeddings
+    """
     if img_tensor.min() < 0:
         img_tensor = (img_tensor + 1) / 2
+    img_tensor = img_tensor * 2 - 1  # ensure [-1,1] range
 
-    for i in range(batch_size):
-        # Tensor -> NumPy (uint8, RGB)
-        img = img_tensor[i].permute(1, 2, 0).detach().cpu().numpy()
-        img_np = np.clip(img * 255, 0, 255).astype(np.uint8)
-
-        # face recogn.
-        dets = detector(img_np, 1)
-        if len(dets) == 0:
-            embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
-            continue
-
-        shape = sp(img_np, dets[0])
-
-        try:
-            face_descriptor = facerec.compute_face_descriptor(img_np, shape, num_jitters=0)
-        except Exception as e:
-            print(f"[WARN] compute_face_descriptor failed on image {i}: {e}")
-            embeddings.append(torch.zeros(128, dtype=torch.float32, device=img_tensor.device))
-            continue
-
-        # convert to tensor
-        face_descriptor = np.array(face_descriptor, dtype=np.float32)
-        embeddings.append(torch.tensor(face_descriptor, dtype=torch.float32, device=img_tensor.device))
-
-    return torch.stack(embeddings)
+    with torch.no_grad():
+        emb = backbone(img_tensor.to(device))
+        emb = torch.nn.functional.normalize(emb, dim=1)
+    return emb
 
 
 #----------------------------------------------------------------------------
@@ -165,7 +156,7 @@ class StyleGAN2Loss(Loss):
                 # ID loss on pairs
                 if getattr(self, 'use_id_loss', True):
                     # gen_img: [batch_size, C, H, W], 2 img /id
-                    emb = dlib_get_face_embedding(gen_img)  # e.g(batch_size, embedding_dim)
+                    emb = get_face_embeddings_aligned(gen_img)
                     emb_a = emb[0::2]  # even index: first image of pair
                     emb_b = emb[1::2]  # odd idx: second image of pair
                     # Cosine similarity: 1 - cos(emb_a, emb_b)
