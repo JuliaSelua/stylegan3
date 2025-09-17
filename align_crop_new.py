@@ -68,53 +68,51 @@ class InferenceDataset(Dataset):
         return len(self.img_paths)
 
 # Alignment
-def align_images(in_folder, out_folder, batchsize, num_imgs=0, evalDB=False):
+def align_images(in_folder, out_folder, num_imgs=0, evalDB=False):
     os.makedirs(out_folder, exist_ok=True)
+    
+    # Prüfen, ob Ordnerstruktur vorhanden ist
     is_folder = is_folder_structure(in_folder)
-    train_dataset = InferenceDataset(in_folder, num_imgs=num_imgs, folder_structure=is_folder)
-    train_loader = DataLoader(train_dataset, batch_size=batchsize, shuffle=False, drop_last=False)
-
+    
+    # Dataset laden
+    dataset = InferenceDataset(in_folder, num_imgs=num_imgs, folder_structure=is_folder)
+    
     skipped_imgs = []
 
-    for img_batch, img_names in tqdm(train_loader):
-        # Filtere None-Bilder direkt
-        valid_imgs = []
-        valid_names = []
-        for img, name in zip(img_batch, img_names):
-            if img is None or not isinstance(img, np.ndarray):
-                skipped_imgs.append(name)
-                continue
-            valid_imgs.append(img)
-            valid_names.append(name)
-
-        if len(valid_imgs) == 0:
+    for img, img_name in tqdm(dataset):
+        if img is None:
+            skipped_imgs.append(img_name)
             continue
 
         # Konvertiere in RGB für MTCNN
-        pil_imgs = [Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)) for img in valid_imgs]
+        pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
         # Face Detection
-        boxes, probs, landmarks = mtcnn.detect(pil_imgs, landmarks=True)
+        boxes, probs, landmarks = mtcnn.detect(pil_img, landmarks=True)
 
-        for img, img_name, landmark in zip(valid_imgs, valid_names, landmarks):
-            if landmark is None or not isinstance(landmark[0], (list, np.ndarray)):
-                skipped_imgs.append(img_name)
-                continue
+        if landmarks is None or not isinstance(landmarks[0], (list, np.ndarray)):
+            skipped_imgs.append(img_name)
+            continue
 
-            out_path = out_folder
-            if is_folder:
-                id_dir = os.path.split(img_name)[0]
-                out_path = ojoin(out_folder, id_dir)
-                os.makedirs(out_path, exist_ok=True)
-                img_name = os.path.split(img_name)[1]
+        # Gesichtspunkte
+        facial5points = np.array(landmarks[0], dtype=np.float32)
 
-            facial5points = np.array(landmark[0], dtype=np.float32)
+        # Output Pfad
+        out_path = out_folder
+        if is_folder:
+            id_dir = os.path.split(img_name)[0]
+            out_path = ojoin(out_folder, id_dir)
+            os.makedirs(out_path, exist_ok=True)
+            img_name = os.path.split(img_name)[1]
 
-            warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
-            cv2.imwrite(os.path.join(out_path, img_name), warped_face)
+        # Normales Cropping
+        warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
+        cv2.imwrite(os.path.join(out_path, img_name), warped_face)
 
-  #  print("Skipped images:", skipped_imgs)
     print(f"Images with no Face: {len(skipped_imgs)}")
+    if skipped_imgs:
+        print("Skipped images:", skipped_imgs[:20], "...")  # nur die ersten 20
+
 
 # CLI
 def main():
