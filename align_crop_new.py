@@ -13,7 +13,7 @@ import torch
 
 # MTCNN initialisieren
 mtcnn = MTCNN(
-    select_largest=True, min_face_size=60, post_process=False, device="cuda:0"
+    select_largest=True, min_face_size=10, post_process=False, device="cuda:0"
 )
 
 # Bilder laden
