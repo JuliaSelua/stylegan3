@@ -59,6 +59,9 @@ class InferenceDataset(Dataset):
             tmp = os.path.dirname(img_path)
             img_file = ojoin(os.path.basename(tmp), img_file)
         img = cv2.imread(img_path)
+        if img is None:
+            print("Konnte Bild nicht lesen:", img_path)
+
         return img, img_file
 
     def __len__(self):
