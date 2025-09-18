@@ -49,9 +49,9 @@ def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
     #    img_tensor = (img_tensor + 1) / 2
     #img_tensor = img_tensor * 2 - 1  # ensure [-1,1] range
     img_tensor = img_tensor.to(device)  # assume already in [-1,1]
-
+    img_resized = F.interpolate(img_tensor, size=(112, 112), mode='bilinear', align_corners=False)
     with torch.no_grad():
-        emb = backbone(img_tensor.to(device))
+        emb = backbone(img_resized)
         emb = torch.nn.functional.normalize(emb, dim=1)
     return emb
 
