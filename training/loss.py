@@ -125,7 +125,7 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss = True):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss = True, use_batch_id_loss = False):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -142,7 +142,7 @@ class StyleGAN2Loss(Loss):
         self.blur_fade_kimg     = blur_fade_kimg
         self.use_id_loss        = use_id_loss
         self.use_style_loss     = use_style_loss
-        self.use_batch_id_loss  = use_batch_is_loss
+        self.use_batch_id_loss  = use_batch_id_loss
         self.style_loss_fn      = StyleLossHelper(device)
 
 
