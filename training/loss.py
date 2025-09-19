@@ -142,6 +142,7 @@ class StyleGAN2Loss(Loss):
         self.blur_fade_kimg     = blur_fade_kimg
         self.use_id_loss        = use_id_loss
         self.use_style_loss     = use_style_loss
+        self.use_batch_id_loss  = use_batch_is_loss
         self.style_loss_fn      = StyleLossHelper(device)
 
 
