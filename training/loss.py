@@ -32,9 +32,6 @@ transform = T.Compose([
     T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
 ])
 
-import torch
-import torch.nn.functional as F
-
 def batch_id_loss(embeddings, lambda_id=1.0):
     """
     embeddings: Tensor [B, 512], B muss gerade sein (2 Bilder pro ID).
