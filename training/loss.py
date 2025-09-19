@@ -32,6 +32,50 @@ transform = T.Compose([
     T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
 ])
 
+import torch
+import torch.nn.functional as F
+
+def batch_id_loss(embeddings, lambda_id=1.0):
+    """
+    embeddings: Tensor [B, 512], B muss gerade sein (2 Bilder pro ID).
+    lambda_id: Gewichtung des ID-Loss.
+    """
+    B = embeddings.size(0)
+    assert B % 2 == 0, "Batch size must be even (pairs of images per ID)."
+
+    # Normiere Embeddings (cosine similarity Basis)
+    embeddings = F.normalize(embeddings, dim=1)
+
+    # Positiv-Paare: immer (0,1), (2,3), ...
+    emb_a = embeddings[0::2]
+    emb_b = embeddings[1::2]
+
+    pos_sim = (emb_a * emb_b).sum(dim=1)  # Cosine Similarity pro Paar
+    pos_loss = (1 - pos_sim).mean()       # wollen nahe beieinander sein
+
+    # Negativ-Paare: jedes A mit allen anderen außer dem Partner
+    neg_loss = 0
+    count = 0
+    for i in range(0, B, 2):
+        for j in range(0, B, 2):
+            if i == j:
+                continue
+            # sim(A_i, B_j) und sim(B_i, A_j)
+            sim1 = (embeddings[i] * embeddings[j+1]).sum()
+            sim2 = (embeddings[i+1] * embeddings[j]).sum()
+            neg_loss += sim1 + sim2
+            count += 2
+
+    neg_loss = neg_loss / count
+    neg_loss = neg_loss.mean() if torch.is_tensor(neg_loss) else neg_loss
+
+    # Ziel: negative ähnlichkeitswerte sollen klein sein → also  max(0, sim)
+    neg_loss = F.relu(neg_loss)
+
+    total_loss = lambda_id * (pos_loss + neg_loss)
+    return total_loss, pos_loss, neg_loss
+
+
 def load_elasticface(device="cuda:0"):
     ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location=device)
     backbone = iresnet100(num_features=512).to(device)
@@ -166,6 +210,19 @@ class StyleGAN2Loss(Loss):
 
                     training_stats.report('Loss/G/id_loss', id_loss)
                     loss_Gmain = loss_Gmain + lambda_id * id_loss
+                    
+                # ID loss on whole batch
+                if getattr(self, 'use_batch_id_loss', True):
+                    # gen_img: [batch_size, C, H, W], 2 img /id
+                    emb = get_face_embeddings_aligned(gen_img)
+                    id_loss, pos_loss, neg_loss = batch_id_loss(emb, lambda_id=1.0)
+                
+                    training_stats.report('Loss/G/id_loss', id_loss)
+                    training_stats.report('Loss/G/id_pos_loss', pos_loss)
+                    training_stats.report('Loss/G/id_neg_loss', neg_loss)
+                
+                    loss_Gmain = loss_Gmain + lambda_id*id_loss
+
                 
                 if getattr(self, 'use_style_loss', True):
                     img_a = gen_img[0::2] 
