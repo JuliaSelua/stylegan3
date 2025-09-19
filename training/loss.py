@@ -32,45 +32,41 @@ transform = T.Compose([
     T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
 ])
 
-def batch_id_loss(embeddings, lambda_id=1.0):
+def batch_id_loss(embeddings, lambda_pos=1.0, lambda_neg=1.0):
     """
-    embeddings: Tensor [B, 512], B muss gerade sein (2 Bilder pro ID).
-    lambda_id: Gewichtung des ID-Loss.
+    embeddings: [B, D], B even (pairs). Returns combined loss and components.
+    lambda_pos / lambda_neg: weights for pos/neg terms (skaliere nach Bedarf).
     """
-    B = embeddings.size(0)
-    assert B % 2 == 0, "Batch size must be even (pairs of images per ID)."
+    B, D = embeddings.shape
+    assert B % 2 == 0, "Batch size must be even (pairs)."
 
-    # Normiere Embeddings (cosine similarity Basis)
-    embeddings = F.normalize(embeddings, dim=1)
+    # normalize
+    emb = F.normalize(embeddings, dim=1)  # [B, D]
 
-    # Positiv-Paare: immer (0,1), (2,3), ...
-    emb_a = embeddings[0::2]
-    emb_b = embeddings[1::2]
+    # similarity matrix
+    sim = emb @ emb.t()  # [B, B], cosine similarities in [-1,1]
 
-    pos_sim = (emb_a * emb_b).sum(dim=1)  # Cosine Similarity pro Paar
-    pos_loss = (1 - pos_sim).mean()       # wollen nahe beieinander sein
+    # --- positive pairs (0,1), (2,3), ...
+    idx_a = torch.arange(0, B, 2, device=emb.device)
+    idx_b = idx_a + 1
+    pos_sims = sim[idx_a, idx_b]  # [B/2]
+    pos_loss = (1.0 - pos_sims).mean()  # want pos_sims -> 1
 
-    # Negativ-Paare: jedes A mit allen anderen außer dem Partner
-    neg_loss = 0
-    count = 0
-    for i in range(0, B, 2):
-        for j in range(0, B, 2):
-            if i == j:
-                continue
-            # sim(A_i, B_j) und sim(B_i, A_j)
-            sim1 = (embeddings[i] * embeddings[j+1]).sum()
-            sim2 = (embeddings[i+1] * embeddings[j]).sum()
-            neg_loss += sim1 + sim2
-            count += 2
+    # --- negative pairs: all pairs except diagonal and the positive pair entries
+    mask = torch.ones_like(sim, dtype=torch.bool, device=emb.device)
+    mask.fill_diagonal_(False)
+    # mask out positive pairs both (i,j) and (j,i)
+    mask[idx_a, idx_b] = False
+    mask[idx_b, idx_a] = False
 
-    neg_loss = neg_loss / count
-    neg_loss = neg_loss.mean() if torch.is_tensor(neg_loss) else neg_loss
+    neg_sims = sim[mask]  # flatten of all remaining similarities
+    # We want negatives to be small. You can use either mean(sim) with relu or margin-based.
+    neg_loss = neg_sims.mean()  # higher similarity -> higher loss, so minimize sim
+    # Optionally clamp (if you expect negative sims to be sometimes negative)
+    neg_loss = F.relu(neg_loss)  # keep non-negative
 
-    # Ziel: negative ähnlichkeitswerte sollen klein sein → also  max(0, sim)
-    neg_loss = F.relu(neg_loss)
-
-    total_loss = lambda_id * (pos_loss + neg_loss)
-    return total_loss, pos_loss, neg_loss
+    total = lambda_pos * pos_loss + lambda_neg * neg_loss
+    return total, pos_loss, neg_loss
 
 
 def load_elasticface(device="cuda:0"):
@@ -78,6 +74,8 @@ def load_elasticface(device="cuda:0"):
     backbone = iresnet100(num_features=512).to(device)
     backbone.load_state_dict(ckpt)
     backbone.eval()
+    for p in backbone.parameters():
+        p.requires_grad = False
     return backbone
 
 backbone = load_elasticface()
@@ -87,14 +85,11 @@ def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
     img_tensor: torch.Tensor [B, C, H, W], already aligned+cropped to 112x112
     return: torch.Tensor [B, 512] embeddings
     """
-    #if img_tensor.min() < 0:
-    #    img_tensor = (img_tensor + 1) / 2
-    #img_tensor = img_tensor * 2 - 1  # ensure [-1,1] range
     img_tensor = img_tensor.to(device)  # assume already in [-1,1]
-    img_resized = F.interpolate(img_tensor, size=(112, 112), mode='bilinear', align_corners=False)
-    with torch.no_grad():
-        emb = backbone(img_resized)
-        emb = torch.nn.functional.normalize(emb, dim=1)
+    if img_tensor.shape[2:] != (112, 112):
+        img_tensor = F.interpolate(img_tensor, size=(112, 112), mode='bilinear', align_corners=False)
+    emb = backbone(img_tensor)
+    emb = torch.nn.functional.normalize(emb, dim=1)
     return emb
 
 
@@ -196,10 +191,13 @@ class StyleGAN2Loss(Loss):
 
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
 
+                if getattr(self, 'use_id_loss', True) or getattr(self, 'use_batch_id_loss', False):
+                    emb = get_face_embeddings_aligned(gen_img)  # compute once
+
                 # ID loss on pairs
                 if getattr(self, 'use_id_loss', True):
                     # gen_img: [batch_size, C, H, W], 2 img /id
-                    emb = get_face_embeddings_aligned(gen_img)
+                    #emb = get_face_embeddings_aligned(gen_img)
                     emb_a = emb[0::2]  # even index: first image of pair
                     emb_b = emb[1::2]  # odd idx: second image of pair
                     # Cosine similarity: 1 - cos(emb_a, emb_b)
@@ -211,7 +209,7 @@ class StyleGAN2Loss(Loss):
                 # ID loss on whole batch
                 if getattr(self, 'use_batch_id_loss', True):
                     # gen_img: [batch_size, C, H, W], 2 img /id
-                    emb = get_face_embeddings_aligned(gen_img)
+                    #emb = get_face_embeddings_aligned(gen_img)
                     id_loss, pos_loss, neg_loss = batch_id_loss(emb, lambda_id=1.0)
                 
                     training_stats.report('Loss/G/id_loss', id_loss)
