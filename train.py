@@ -192,9 +192,9 @@ def main(**kwargs):
     c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
     if opts.cfg == 'stylegan2':
-        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_style_loss=True)
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_batch_id_loss=False, use_style_loss=True)
     elif opts.cfg == 'baseline':
-        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_batch_id_loss=True, use_style_loss=False)
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=True, use_style_loss=False)
     else:
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
 
