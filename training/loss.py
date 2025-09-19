@@ -210,13 +210,13 @@ class StyleGAN2Loss(Loss):
                 if getattr(self, 'use_batch_id_loss', True):
                     # gen_img: [batch_size, C, H, W], 2 img /id
                     #emb = get_face_embeddings_aligned(gen_img)
-                    id_loss, pos_loss, neg_loss = batch_id_loss(emb, lambda_id=1.0)
+                    id_loss, pos_loss, neg_loss = batch_id_loss(emb, lambda_pos=1.0, lambda_neg=1.0)
                 
                     training_stats.report('Loss/G/id_loss', id_loss)
                     training_stats.report('Loss/G/id_pos_loss', pos_loss)
                     training_stats.report('Loss/G/id_neg_loss', neg_loss)
                 
-                    loss_Gmain = loss_Gmain + lambda_id*id_loss
+                    loss_Gmain = loss_Gmain + id_loss
 
                 
                 if getattr(self, 'use_style_loss', True):
