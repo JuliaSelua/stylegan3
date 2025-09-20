@@ -69,7 +69,7 @@ def batch_id_loss(embeddings, lambda_pos=1.0, lambda_neg=1.0):
     return total, pos_loss, neg_loss
 
 
-def load_elasticface(device="cuda:0"):
+"""def load_elasticface(device="cuda:0"):
     ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location=device)
     backbone = iresnet100(num_features=512).to(device)
     backbone.load_state_dict(ckpt)
@@ -79,6 +79,16 @@ def load_elasticface(device="cuda:0"):
     return backbone
 
 backbone = load_elasticface()
+"""
+def load_elasticface(device):
+    ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location=device)
+    backbone = iresnet100(num_features=512).to(device)
+    backbone.load_state_dict(ckpt)
+    backbone.eval()
+    for p in backbone.parameters():
+        p.requires_grad = False
+    return backbone
+
 
 def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
     """
@@ -143,7 +153,9 @@ class StyleGAN2Loss(Loss):
         self.use_id_loss        = use_id_loss
         self.use_style_loss     = use_style_loss
         self.use_batch_id_loss  = use_batch_id_loss
-        self.style_loss_fn      = StyleLossHelper(device)
+        self.style_loss_fn      = StyleLossHelper(self.device)
+        self.backbone = load_elasticface(self.device)
+
 
 
     def run_G(self, z, z2, c, update_emas=False):
@@ -193,7 +205,8 @@ class StyleGAN2Loss(Loss):
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
 
                 if getattr(self, 'use_id_loss', True) or getattr(self, 'use_batch_id_loss', False):
-                    emb = get_face_embeddings_aligned(gen_img)  # compute once
+                    #emb = get_face_embeddings_aligned(gen_img)  # compute once
+                    emb = get_face_embeddings_aligned(gen_img, device=self.device)
 
                 # ID loss on pairs
                 if getattr(self, 'use_id_loss', True):
@@ -221,8 +234,10 @@ class StyleGAN2Loss(Loss):
 
                 
                 if getattr(self, 'use_style_loss', True):
-                    img_a = gen_img[0::2] 
-                    img_b = gen_img[1::2]  
+                    #img_a = gen_img[0::2] 
+                    #img_b = gen_img[1::2]  
+                    img_a = gen_img[0::2].to(self.device)
+                    img_b = gen_img[1::2].to(self.device)
                     #style_loss = style_divergence_loss(img_a, img_b)  # LPIPS Loss
                     style_loss = self.style_loss_fn(img_a, img_b)
                     training_stats.report('Loss/G/style_loss', style_loss)
