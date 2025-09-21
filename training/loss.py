@@ -90,7 +90,7 @@ def load_elasticface(device):
     return backbone
 
 
-def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
+def get_face_embeddings_aligned(img_tensor, device="cuda:0", backbone=None):
     """
     img_tensor: torch.Tensor [B, C, H, W], already aligned+cropped to 112x112
     return: torch.Tensor [B, 512] embeddings
@@ -98,6 +98,9 @@ def get_face_embeddings_aligned(img_tensor, device="cuda:0"):
     img_tensor = img_tensor.to(device)  # assume already in [-1,1]
     if img_tensor.shape[2:] != (112, 112):
         img_tensor = F.interpolate(img_tensor, size=(112, 112), mode='bilinear', align_corners=False)
+    if backbone is None:
+        raise ValueError("Backbone model must be provided")
+
     emb = backbone(img_tensor)
     emb = torch.nn.functional.normalize(emb, dim=1)
     return emb
@@ -206,7 +209,7 @@ class StyleGAN2Loss(Loss):
 
                 if getattr(self, 'use_id_loss', True) or getattr(self, 'use_batch_id_loss', False):
                     #emb = get_face_embeddings_aligned(gen_img)  # compute once
-                    emb = get_face_embeddings_aligned(gen_img, device=self.device)
+                    emb = get_face_embeddings_aligned(gen_img, device=self.device, backbone=self.backbone)
 
                 # ID loss on pairs
                 if getattr(self, 'use_id_loss', True):
