@@ -1,89 +1,59 @@
-# evaluate_individual.py
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-from itertools import product
-from pyeer.eer_info import get_eer_stats
-from pyeer.report import generate_eer_report
-
-# ------------------- Pfade -------------------
-EMBEDDINGS_PATH = "out/embeddings/embeddings.npy"
-LABELS_PATH = "out/embeddings/labels.npy"
-OUTPUT_DIR = "out/evaluation"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
 import torch
-import numpy as np
 
-# ------------------- Laden -------------------
-embeddings = torch.load(EMBEDDINGS_PATH, map_location="cpu")
-labels = torch.load(LABELS_PATH, map_location="cpu")
+# === Lade Embeddings ===
+emb_path = "embeddings.npy"
+labels_path = "labels.npy"
 
-# Konvertiere ggf. zu NumPy
-if isinstance(embeddings, torch.Tensor):
-    embeddings = embeddings.numpy()
-if isinstance(labels, torch.Tensor):
+embeddings = torch.load(emb_path, map_location="cpu")
+labels = torch.load(labels_path, map_location="cpu")
+
+# --- Normalisiere auf numpy 2D Array ---
+if isinstance(embeddings, list):
+    # Liste von Vektoren
+    embeddings = np.stack([e.detach().cpu().numpy() if torch.is_tensor(e) else np.array(e) for e in embeddings])
+elif torch.is_tensor(embeddings):
+    embeddings = embeddings.detach().cpu().numpy()
+elif isinstance(embeddings, np.lib.npyio.NpzFile):
+    # Falls es np.savez war
+    print("Embeddings keys:", embeddings.files)
+    embeddings = embeddings[embeddings.files[0]]
+elif isinstance(embeddings, np.ndarray):
+    pass
+else:
+    raise TypeError(f"Unsupported embeddings type: {type(embeddings)}")
+
+# Labels ebenfalls angleichen
+if isinstance(labels, list):
     labels = np.array(labels)
+elif torch.is_tensor(labels):
+    labels = labels.cpu().numpy()
 
-print(f"Loaded {embeddings.shape[0]} embeddings of size {embeddings.shape[1]}")
-print(f"Unique IDs: {len(np.unique(labels))}")
-print("Type:", type(embeddings))
-print("Shape:", getattr(embeddings, "shape", "no shape"))
-print("First element type:", type(embeddings[0]))
-print("First element example:", embeddings[0])
+print(f"Loaded embeddings shape: {embeddings.shape}")
+print(f"Loaded labels shape: {labels.shape}")
 
-# ------------------- Helpers -------------------
-def generate_genuine_pairs(labels):
-    """Alle Paare mit derselben ID"""
-    for label in np.unique(labels):
-        idxs = np.where(labels == label)[0]
-        for i, j in product(idxs, idxs):
-            if i < j:  # keine Duplikate
-                yield i, j
+# === Beispiel: Genuine & Imposter Scores ===
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-def generate_random_imposter_pairs(labels, n=10000):
-    """Random Paare mit unterschiedlicher ID"""
-    seen = set()
-    while len(seen) < n:
-        i, j = np.random.choice(len(labels), 2, replace=False)
-        if labels[i] != labels[j]:
-            seen.add((i, j))
-            yield i, j
-
-# ------------------- Score Berechnung -------------------
 genuine_scores = []
-for i, j in generate_genuine_pairs(labels):
-    cos_sim = np.dot(embeddings[i], embeddings[j])
-    genuine_scores.append(cos_sim)
-
 imposter_scores = []
-for i, j in generate_random_imposter_pairs(labels, n=len(genuine_scores)):
-    cos_sim = np.dot(embeddings[i], embeddings[j])
-    imposter_scores.append(cos_sim)
+
+for i in range(len(embeddings)):
+    for j in range(i + 1, len(embeddings)):
+        sim = cosine_similarity(embeddings[i], embeddings[j])
+        if labels[i] == labels[j]:
+            genuine_scores.append(sim)
+        else:
+            imposter_scores.append(sim)
 
 print(f"Genuine pairs: {len(genuine_scores)}")
 print(f"Imposter pairs: {len(imposter_scores)}")
 
-# ------------------- Plotten -------------------
-plt.figure(figsize=(8,6))
-plt.hist(genuine_scores, bins=np.linspace(-1, 1, 50), alpha=0.5, label="Genuine", color="green")
-plt.hist(imposter_scores, bins=np.linspace(-1, 1, 50), alpha=0.5, label="Imposter", color="red")
-plt.xlabel("Cosine similarity")
-plt.ylabel("Frequency")
-plt.legend()
-plt.title("Synthetic vs Synthetic")
-plt.savefig(os.path.join(OUTPUT_DIR, "synthetic_vs_synthetic.png"), dpi=200)
+# Speichern für spätere Auswertung / Plotten
+os.makedirs("evaluation", exist_ok=True)
+np.savetxt("evaluation/genuine_scores.txt", genuine_scores)
+np.savetxt("evaluation/imposter_scores.txt", imposter_scores)
 
-# ------------------- EER Stats -------------------
-eer_stats = get_eer_stats(genuine_scores, imposter_scores)
-print("EER stats:", eer_stats)
-
-# Optional: HTML-Report
-report_path = os.path.join(OUTPUT_DIR, "pyeer_report.html")
-generate_eer_report([eer_stats], ["synthetic_vs_synthetic"], report_path)
-
-# ------------------- Save Raw Scores -------------------
-np.savetxt(os.path.join(OUTPUT_DIR, "genuine_scores.txt"), genuine_scores)
-np.savetxt(os.path.join(OUTPUT_DIR, "imposter_scores.txt"), imposter_scores)
-
-print("Done. Results saved in:", OUTPUT_DIR)
+print("Saved genuine_scores.txt and imposter_scores.txt in evaluation/")
