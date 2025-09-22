@@ -25,10 +25,7 @@ for fname in sorted(os.listdir(INPUT_DIR)):
         img = Image.open(input_path).convert("RGB")
         img_np = np.array(img)
 
-        # Sicherstellen, dass es HxWx3 ist
-        if img_np.ndim != 3 or img_np.shape[2] != 3:
-            img_np = np.array(img.resize((ALIGNED_SIZE, ALIGNED_SIZE)))
-
+        # Gesicht erkennen
         boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
         if boxes is not None and boxes[0] is not None and len(boxes[0]) > 0:
@@ -38,14 +35,25 @@ for fname in sorted(os.listdir(INPUT_DIR)):
             idx = np.argmin(np.sum((box_centers - img_center)**2, axis=1))
             facial5points = landmarks[0][idx]
             aligned_np = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
+
+            # Normieren auf uint8, falls nötig
+            if aligned_np.dtype != np.uint8:
+                aligned_np = np.clip(aligned_np, 0, 255).astype(np.uint8)
+
             aligned_img = Image.fromarray(aligned_np)
             print(f"{fname}: face aligned")
+
         else:
             # Kein Gesicht → fallback resize
             aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
             print(f"{fname}: 0 faces detected, fallback resize applied")
 
+        # Speichern sicherstellen
         aligned_img.save(output_path)
+        if os.path.exists(output_path):
+            print(f"Saved {output_path}")
+        else:
+            print(f"Failed to save {output_path}")
 
     except Exception as e:
         print(f"Skipped {fname} due to {e}")
