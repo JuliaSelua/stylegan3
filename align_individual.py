@@ -61,7 +61,10 @@ for fname in os.listdir(INPUT_DIR):
 
         # Speichern
         print(fname, "aligned shape:", aligned.shape, "min/max:", aligned.min(), aligned.max())
-        save_image(aligned, output_path)
+        # Tensor zurückskalieren auf [0,1] für save_image
+        aligned_to_save = (aligned + 1.0) / 2.0  # [-1,1] -> [0,1]
+        save_image(aligned_to_save, output_path)
+        #save_image(aligned, output_path)
         print(f"Aligned {fname}")
 
     except Exception as e:
