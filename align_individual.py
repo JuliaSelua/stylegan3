@@ -9,7 +9,7 @@ import numpy as np
 from utils.alignment.arcface import norm_crop  # iDiff utility
 
 # ------------------- Pfade -------------------
-INPUT_DIR = "out/id_samples"           # Ordner mit generierten Einzelbildern (pro ID Unterordner)
+INPUT_DIR = "out/id_samples"           # Ordner mit generierten Einzelbildern
 OUTPUT_DIR = "out/id_samples_aligned"  # Ordner für aligned Bilder
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -22,20 +22,22 @@ mtcnn = MTCNN(keep_all=True, min_face_size=20, post_process=False, device=device
 # ------------------- Main Loop -------------------
 skipped = []
 
+# Rekursive Schleife über ID-Unterordner
 for id_folder in sorted(os.listdir(INPUT_DIR)):
     id_path = os.path.join(INPUT_DIR, id_folder)
     if not os.path.isdir(id_path):
         continue
 
-    output_id_path = os.path.join(OUTPUT_DIR, id_folder)
-    os.makedirs(output_id_path, exist_ok=True)
+    # Erstelle Ziel-Unterordner
+    output_id_dir = os.path.join(OUTPUT_DIR, id_folder)
+    os.makedirs(output_id_dir, exist_ok=True)
 
     for fname in sorted(os.listdir(id_path)):
         if not (fname.endswith(".png") or fname.endswith(".jpg")):
             continue
 
         input_path = os.path.join(id_path, fname)
-        output_path = os.path.join(output_id_path, fname)
+        output_path = os.path.join(output_id_dir, fname)
 
         try:
             # Bild laden
@@ -50,7 +52,7 @@ for id_folder in sorted(os.listdir(INPUT_DIR)):
             if boxes is None or landmarks is None:
                 # Fallback: einfache Resize
                 aligned = transforms.functional.resize(img, ALIGNED_SIZE)
-                print(f"{id_folder}/{fname}: 0 faces detected, fallback resize applied")
+                print(f"{fname}: 0 faces detected, fallback resize applied")
 
             else:
                 # Wähle Gesicht, das am nächsten zur Bildmitte liegt
@@ -60,20 +62,17 @@ for id_folder in sorted(os.listdir(INPUT_DIR)):
                 facial5points = landmarks[0][idx]
 
                 # norm_crop
-                print(fname, "img_np shape:", img_np.shape, "dtype:", img_np.dtype)
                 aligned_img = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
                 aligned = torch.from_numpy(aligned_img).permute(2,0,1)/255.0
 
-            # Debug-Print
-            print(f"{id_folder}/{fname} aligned shape:", aligned.shape, "min/max:", aligned.min(), aligned.max())
-
             # Speichern
+            print(fname, "aligned shape:", aligned.shape, "min/max:", aligned.min(), aligned.max())
             save_image(aligned, output_path)
-            print(f"Aligned {id_folder}/{fname}")
+            print(f"Aligned {fname}")
 
         except Exception as e:
-            print(f"Skipped {id_folder}/{fname} due to {e}")
-            skipped.append(f"{id_folder}/{fname}")
+            print(f"Skipped {fname} due to {e}")
+            skipped.append(os.path.join(id_folder, fname))
 
 # ------------------- Log -------------------
 if skipped:
@@ -82,3 +81,4 @@ if skipped:
             f.write(s + "\n")
 
 print(f"Finished aligning. Skipped {len(skipped)} images.")
+
