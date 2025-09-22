@@ -56,6 +56,8 @@ for fname in os.listdir(INPUT_DIR):
             aligned = torch.from_numpy(aligned_img).permute(2,0,1)/255.0
 
         # Speichern
+        print(fname, "aligned shape:", aligned.shape, "min/max:", aligned.min(), aligned.max())
+
         save_image(aligned, output_path)
         print(f"Aligned {fname}")
 
