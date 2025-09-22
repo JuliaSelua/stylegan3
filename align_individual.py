@@ -40,13 +40,15 @@ for id_folder in os.listdir(INPUT_DIR):
         try:
             # Bild laden
             img = Image.open(input_path).convert("RGB")
-            img_tensor = transforms.functional.to_tensor(img)
-            img_np = (img_tensor.permute(1,2,0).numpy() * 255).astype(np.uint8)
-
+            img_np = np.array(img)  # direkt NumPy-Array (H,W,3), uint8 automatisch)
+            if img_np.dtype != np.uint8:
+                img_np = (img_np * 255).astype(np.uint8)
+            
             # Gesichter erkennen
             boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
-            boxes = boxes[0]
+            boxes = boxes[0]       # Einzelbild wieder entpacken
             landmarks = landmarks[0]
+
 
             if landmarks is None or len(landmarks) == 0:
                 # Fallback: einfache Resize
