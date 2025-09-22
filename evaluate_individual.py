@@ -27,6 +27,10 @@ if isinstance(labels, torch.Tensor):
 
 print(f"Loaded {embeddings.shape[0]} embeddings of size {embeddings.shape[1]}")
 print(f"Unique IDs: {len(np.unique(labels))}")
+print("Type:", type(embeddings))
+print("Shape:", getattr(embeddings, "shape", "no shape"))
+print("First element type:", type(embeddings[0]))
+print("First element example:", embeddings[0])
 
 # ------------------- Helpers -------------------
 def generate_genuine_pairs(labels):
