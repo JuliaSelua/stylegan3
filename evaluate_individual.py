@@ -3,8 +3,8 @@ import numpy as np
 import torch
 
 # === Lade Embeddings ===
-emb_path = "embeddings.npy"
-labels_path = "labels.npy"
+emb_path = "out/embeddings/embeddings.npy"
+labels_path = "out/embeddings/labels.npy"
 
 embeddings = torch.load(emb_path, map_location="cpu")
 labels = torch.load(labels_path, map_location="cpu")
