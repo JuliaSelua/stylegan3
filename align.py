@@ -1,4 +1,4 @@
-# align_id_grids.py
+# align_id_grids_safe.py
 import os
 from PIL import Image
 import torch
@@ -10,11 +10,11 @@ import numpy as np
 from utils.alignment.arcface import norm_crop  # iDiff arcface utility
 
 # Pfade
-INPUT_DIR = "out/id_samples"  # Ordner mit deinen Grids
+INPUT_DIR = "out/id_samples"           # Ordner mit deinen Grids
 OUTPUT_DIR = "out/id_samples_aligned"  # Ordner für aligned Grids
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-GRID_IMAGE_SIZE = 128  # Größe der Einzelbilder im Grid (wie beim Generieren)
+GRID_IMAGE_SIZE = 128  # Größe der Einzelbilder im Grid
 ALIGNED_SIZE = 112     # Größe nach norm_crop
 
 # Face Detector
@@ -52,30 +52,37 @@ for fname in os.listdir(INPUT_DIR):
         # 2. Align Faces
         for tile in tiles:
             img_np = (tile.permute(1,2,0).numpy() * 255).astype(np.uint8)
-            print(tile.shape)
-            #boxes, _, landmarks = mtcnn.detect(img_np, landmarks=True)
-            boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
-            boxes = boxes[0]       # Einzelbild wieder entpacken
-            landmarks = landmarks[0]
 
-            if landmarks is None:
-                # Fallback: einfache Resize
+            try:
+                boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
+            except Exception as e:
+                print(f"Exception during MTCNN detection: {e}")
+                boxes, landmarks = None, None
+
+            # Prüfen ob MTCNN etwas gefunden hat
+            if landmarks is None or len(landmarks[0]) == 0:
+                # Kein Gesicht erkannt: Fallback Resize
                 tile_resized = transforms.functional.resize(tile, ALIGNED_SIZE)
                 aligned_tiles.append(tile_resized)
                 continue
 
-            # Wähle Gesicht, das am nächsten zur Bildmitte liegt
+            # Einzelbild entpacken
+            boxes = boxes[0]
+            landmarks = landmarks[0]
+
+            # Wenn mehrere Gesichter, das mittigste auswählen
             box_centers = np.mean(boxes, axis=1)
             img_center = np.array([img_np.shape[1]/2, img_np.shape[0]/2])
             idx = np.argmin(np.sum((box_centers - img_center)**2, axis=1))
             facial5points = landmarks[idx]
 
-            # norm_crop
+            # norm_crop anwenden
             aligned_img = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
             aligned_tiles.append(torch.from_numpy(aligned_img).permute(2,0,1)/255.0)
 
         # 3. Stack & Save Grid
-        aligned_grid = make_grid(torch.stack(aligned_tiles), nrow=int(np.sqrt(len(aligned_tiles))), padding=0)
+        nrow = int(np.sqrt(len(aligned_tiles)))  # z.B. 5 für 5x5 Grid
+        aligned_grid = make_grid(torch.stack(aligned_tiles), nrow=nrow, padding=0)
         save_image(aligned_grid, output_path)
         print(f"Aligned {fname}")
 
