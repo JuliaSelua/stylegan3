@@ -53,7 +53,10 @@ for fname in os.listdir(INPUT_DIR):
         for tile in tiles:
             img_np = (tile.permute(1,2,0).numpy() * 255).astype(np.uint8)
             print(tile.shape)
-            boxes, _, landmarks = mtcnn.detect(img_np, landmarks=True)
+            #boxes, _, landmarks = mtcnn.detect(img_np, landmarks=True)
+            boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
+            boxes = boxes[0]       # Einzelbild wieder entpacken
+            landmarks = landmarks[0]
 
             if landmarks is None:
                 # Fallback: einfache Resize
