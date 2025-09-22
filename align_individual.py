@@ -14,55 +14,45 @@ mtcnn = MTCNN(keep_all=True, min_face_size=20, post_process=False, device=device
 
 skipped = []
 
-for root, _, files in os.walk(INPUT_DIR):
-    for fname in files:
-        if not (fname.endswith(".png") or fname.endswith(".jpg")):
-            continue
+for fname in sorted(os.listdir(INPUT_DIR)):
+    if not fname.lower().endswith((".png", ".jpg", ".jpeg")):
+        continue
 
-        input_path = os.path.join(root, fname)
+    input_path = os.path.join(INPUT_DIR, fname)
+    output_path = os.path.join(OUTPUT_DIR, fname)
 
-        # Unterordner-Struktur beibehalten
-        rel_path = os.path.relpath(root, INPUT_DIR)
-        output_subdir = os.path.join(OUTPUT_DIR, rel_path)
-        os.makedirs(output_subdir, exist_ok=True)
-        output_path = os.path.join(output_subdir, fname)
+    try:
+        img = Image.open(input_path).convert("RGB")
+        img_np = np.array(img)
 
-        try:
-            img = Image.open(input_path).convert("RGB")
-            img_np = np.array(img)
+        # Sicherstellen, dass es ein HxWx3 Array ist
+        if img_np.ndim != 3 or img_np.shape[2] != 3:
+            print(f"{fname}: invalid image shape {img_np.shape}, fallback resize applied")
+            img_np = np.array(img.resize((ALIGNED_SIZE, ALIGNED_SIZE)))
 
-            boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
+        boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
-            aligned_img = None
-            # Sicherstellen, dass boxes[0] existiert und nicht leer ist
-            if boxes is None or landmarks is None or boxes[0] is None or len(boxes[0]) == 0:
-                aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
-                print(f"{fname}: 0 faces detected, fallback resize applied")
-            else:
-                # Gesicht, das am nächsten zur Bildmitte liegt
-                box_centers = np.mean(boxes[0], axis=1)
-                img_center = np.array([img_np.shape[1]/2, img_np.shape[0]/2])
-                idx = np.argmin(np.sum((box_centers - img_center)**2, axis=1))
-                facial5points = landmarks[0][idx]
+        aligned_img = None
 
-                aligned_np = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
-                if aligned_np is None or aligned_np.size == 0:
-                    aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
-                    print(f"{fname}: norm_crop failed, fallback resize applied")
-                else:
-                    aligned_img = Image.fromarray(aligned_np)
+        if boxes is None or boxes[0] is None or len(boxes[0]) == 0:
+            # Kein Gesicht gefunden → fallback resize
+            aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
+            print(f"{fname}: 0 faces detected, fallback resize applied")
+        else:
+            # Wähle Gesicht in Bildmitte
+            box_centers = np.mean(boxes[0], axis=1)
+            img_center = np.array([img_np.shape[1] / 2, img_np.shape[0] / 2])
+            idx = np.argmin(np.sum((box_centers - img_center) ** 2, axis=1))
+            facial5points = landmarks[0][idx]
 
-            aligned_img.save(output_path)
-            print(f"Aligned {fname} -> {output_path}")
+            aligned_np = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
+            aligned_img = Image.fromarray(aligned_np)
 
-        except Exception as e:
-            print(f"Skipped {fname} due to {e}")
-            skipped.append(fname)
+        aligned_img.save(output_path)
+        print(f"Aligned {fname}")
 
-if skipped:
-    with open(os.path.join(OUTPUT_DIR, "skipped.txt"), "w") as f:
-        for s in skipped:
-            f.write(s + "\n")
+    except Exception as e:
+        print(f"Skipped {fname} due to {e}")
+        skipped.append(fname)
 
 print(f"Finished aligning. Skipped {len(skipped)} images.")
-
