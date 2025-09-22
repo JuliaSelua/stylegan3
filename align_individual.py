@@ -49,10 +49,12 @@ for id_folder in sorted(os.listdir(INPUT_DIR)):
             # Gesichter erkennen
             boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
-            if boxes is None or landmarks is None:
+            # Prüfe, ob boxes und landmarks korrekt sind
+            if boxes is None or landmarks is None or len(boxes[0].shape) != 2 or len(landmarks[0].shape) != 2:
                 # Fallback: einfache Resize
                 aligned = transforms.functional.resize(img, ALIGNED_SIZE)
-                print(f"{fname}: 0 faces detected, fallback resize applied")
+                print(f"{fname}: 0 faces detected or invalid shape, fallback resize applied")
+
 
             else:
                 # Wähle Gesicht, das am nächsten zur Bildmitte liegt
