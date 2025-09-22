@@ -13,11 +13,21 @@ OUTPUT_DIR = "out/evaluation"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ------------------- Laden -------------------
-embeddings = np.load(EMBEDDINGS_PATH)
-labels = np.load(LABELS_PATH)
+embeddings = np.load(EMBEDDINGS_PATH, allow_pickle=True)
+labels = np.load(LABELS_PATH, allow_pickle=True)
+
+# Falls es npz-Dateien sind:
+if isinstance(embeddings, np.lib.npyio.NpzFile):
+    print("Embeddings keys:", embeddings.files)
+    embeddings = embeddings["arr_0"]  # oder der passende Key
+
+if isinstance(labels, np.lib.npyio.NpzFile):
+    print("Labels keys:", labels.files)
+    labels = labels["arr_0"]
 
 print(f"Loaded {embeddings.shape[0]} embeddings of size {embeddings.shape[1]}")
 print(f"Unique IDs: {len(np.unique(labels))}")
+
 
 # ------------------- Helpers -------------------
 def generate_genuine_pairs(labels):
