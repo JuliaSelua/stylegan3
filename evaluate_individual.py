@@ -12,22 +12,21 @@ LABELS_PATH = "out/embeddings/labels.npy"
 OUTPUT_DIR = "out/evaluation"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+import torch
+import numpy as np
+
 # ------------------- Laden -------------------
-embeddings = np.load(EMBEDDINGS_PATH, allow_pickle=True)
-labels = np.load(LABELS_PATH, allow_pickle=True)
+embeddings = torch.load(EMBEDDINGS_PATH, map_location="cpu")
+labels = torch.load(LABELS_PATH, map_location="cpu")
 
-# Falls es npz-Dateien sind:
-if isinstance(embeddings, np.lib.npyio.NpzFile):
-    print("Embeddings keys:", embeddings.files)
-    embeddings = embeddings["arr_0"]  # oder der passende Key
-
-if isinstance(labels, np.lib.npyio.NpzFile):
-    print("Labels keys:", labels.files)
-    labels = labels["arr_0"]
+# Konvertiere ggf. zu NumPy
+if isinstance(embeddings, torch.Tensor):
+    embeddings = embeddings.numpy()
+if isinstance(labels, torch.Tensor):
+    labels = np.array(labels)
 
 print(f"Loaded {embeddings.shape[0]} embeddings of size {embeddings.shape[1]}")
 print(f"Unique IDs: {len(np.unique(labels))}")
-
 
 # ------------------- Helpers -------------------
 def generate_genuine_pairs(labels):
