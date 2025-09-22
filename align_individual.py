@@ -60,6 +60,7 @@ for id_folder in sorted(os.listdir(INPUT_DIR)):
                 facial5points = landmarks[0][idx]
 
                 # norm_crop
+                print(fname, "img_np shape:", img_np.shape, "dtype:", img_np.dtype)
                 aligned_img = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
                 aligned = torch.from_numpy(aligned_img).permute(2,0,1)/255.0
 
