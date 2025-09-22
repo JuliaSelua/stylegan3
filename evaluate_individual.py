@@ -1,59 +1,48 @@
+# evaluate_individual_fixed.py
 import os
 import numpy as np
-import torch
+from sklearn.metrics.pairwise import cosine_similarity
 
-# === Lade Embeddings ===
-emb_path = "out/embeddings/embeddings.npy"
-labels_path = "out/embeddings/labels.npy"
+# ------------------- Pfade -------------------
+EMBEDDINGS_PATH = "out/embeddings/embeddings.npy"
+LABELS_PATH = "out/embeddings/labels.npy"
+EVAL_DIR = "evaluation"
+os.makedirs(EVAL_DIR, exist_ok=True)
 
-embeddings = torch.load(emb_path, map_location="cpu")
-labels = torch.load(labels_path, map_location="cpu")
+# ------------------- Load embeddings and labels -------------------
+embeddings = np.load(EMBEDDINGS_PATH)
+labels = np.load(LABELS_PATH)
 
-# --- Normalisiere auf numpy 2D Array ---
-if isinstance(embeddings, list):
-    # Liste von Vektoren
-    embeddings = np.stack([e.detach().cpu().numpy() if torch.is_tensor(e) else np.array(e) for e in embeddings])
-elif torch.is_tensor(embeddings):
-    embeddings = embeddings.detach().cpu().numpy()
-elif isinstance(embeddings, np.lib.npyio.NpzFile):
-    # Falls es np.savez war
-    print("Embeddings keys:", embeddings.files)
-    embeddings = embeddings[embeddings.files[0]]
-elif isinstance(embeddings, np.ndarray):
-    pass
-else:
-    raise TypeError(f"Unsupported embeddings type: {type(embeddings)}")
+print("Loaded embeddings shape:", embeddings.shape)
+print("Loaded labels shape:", labels.shape)
 
-# Labels ebenfalls angleichen
-if isinstance(labels, list):
-    labels = np.array(labels)
-elif torch.is_tensor(labels):
-    labels = labels.cpu().numpy()
+if embeddings.shape[0] == 0:
+    print("No embeddings found! Exiting.")
+    exit()
 
-print(f"Loaded embeddings shape: {embeddings.shape}")
-print(f"Loaded labels shape: {labels.shape}")
-
-# === Beispiel: Genuine & Imposter Scores ===
-def cosine_similarity(a, b):
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
+# ------------------- Compute genuine & imposter pairs -------------------
 genuine_scores = []
 imposter_scores = []
 
-for i in range(len(embeddings)):
-    for j in range(i + 1, len(embeddings)):
-        sim = cosine_similarity(embeddings[i], embeddings[j])
+num_samples = len(labels)
+for i in range(num_samples):
+    for j in range(i + 1, num_samples):
+        sim = cosine_similarity(
+            embeddings[i].reshape(1, -1),
+            embeddings[j].reshape(1, -1)
+        )[0][0]
+
         if labels[i] == labels[j]:
             genuine_scores.append(sim)
         else:
             imposter_scores.append(sim)
 
-print(f"Genuine pairs: {len(genuine_scores)}")
-print(f"Imposter pairs: {len(imposter_scores)}")
+print("Genuine pairs:", len(genuine_scores))
+print("Imposter pairs:", len(imposter_scores))
 
-# Speichern für spätere Auswertung / Plotten
-os.makedirs("evaluation", exist_ok=True)
-np.savetxt("evaluation/genuine_scores.txt", genuine_scores)
-np.savetxt("evaluation/imposter_scores.txt", imposter_scores)
+# ------------------- Save scores -------------------
+np.savetxt(os.path.join(EVAL_DIR, "genuine_scores.txt"), genuine_scores)
+np.savetxt(os.path.join(EVAL_DIR, "imposter_scores.txt"), imposter_scores)
 
-print("Saved genuine_scores.txt and imposter_scores.txt in evaluation/")
+print(f"Saved genuine_scores.txt and imposter_scores.txt in {EVAL_DIR}/")
+
