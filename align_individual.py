@@ -4,19 +4,16 @@ import numpy as np
 from facenet_pytorch import MTCNN
 from utils.alignment.arcface import norm_crop
 
-# ------------------- Pfade -------------------
-INPUT_DIR = "out/id_samples"           # Originalbilder (mit Unterordnern pro ID)
-OUTPUT_DIR = "out/id_samples_aligned"  # Ausgabepfad
+INPUT_DIR = "out/id_samples"
+OUTPUT_DIR = "out/id_samples_aligned"
 ALIGNED_SIZE = 112
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ------------------- MTCNN Setup -------------------
 device = "cuda" if __import__('torch').cuda.is_available() else "cpu"
 mtcnn = MTCNN(keep_all=True, min_face_size=20, post_process=False, device=device)
 
 skipped = []
 
-# ------------------- Rekursiv durch alle Unterordner -------------------
 for root, _, files in os.walk(INPUT_DIR):
     for fname in files:
         if not (fname.endswith(".png") or fname.endswith(".jpg")):
@@ -37,8 +34,8 @@ for root, _, files in os.walk(INPUT_DIR):
             boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
             aligned_img = None
-            if boxes is None or landmarks is None or len(boxes[0]) == 0:
-                # fallback: einfach resize
+            # Sicherstellen, dass boxes[0] existiert und nicht leer ist
+            if boxes is None or landmarks is None or boxes[0] is None or len(boxes[0]) == 0:
                 aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
                 print(f"{fname}: 0 faces detected, fallback resize applied")
             else:
@@ -68,3 +65,4 @@ if skipped:
             f.write(s + "\n")
 
 print(f"Finished aligning. Skipped {len(skipped)} images.")
+
