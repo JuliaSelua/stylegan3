@@ -42,6 +42,8 @@ for fname in os.listdir(INPUT_DIR):
         if boxes is None or landmarks is None:
             # Fallback: einfache Resize
             aligned = transforms.functional.resize(img, ALIGNED_SIZE)
+            print(f"{fname}: 0 faces detected, fallback resize applied")
+
         else:
             # Wähle Gesicht, das am nächsten zur Bildmitte liegt
             box_centers = np.mean(boxes[0], axis=1)
