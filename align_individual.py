@@ -1,26 +1,19 @@
-# align_individual_fixed_v2.py
 import os
 from PIL import Image
-import torch
-import torchvision.transforms as transforms
-from torchvision.utils import save_image
-from facenet_pytorch import MTCNN
 import numpy as np
-from utils.alignment.arcface import norm_crop  # iDiff utility
-from utils.helpers import normalize_to_neg_one_to_one
+from facenet_pytorch import MTCNN
+from utils.alignment.arcface import norm_crop
 
-# ------------------- Pfade -------------------
-INPUT_DIR = "out/id_samples"           # Ordner mit generierten Einzelbildern
-OUTPUT_DIR = "out/id_samples_aligned"  # Ordner für aligned Bilder
+# Pfade
+INPUT_DIR = "out/id_samples"
+OUTPUT_DIR = "out/id_samples_aligned"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+ALIGNED_SIZE = 112
 
-ALIGNED_SIZE = 112  # Größe nach norm_crop
-
-# ------------------- MTCNN Setup -------------------
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# MTCNN Setup
+device = "cuda" if __import__('torch').cuda.is_available() else "cpu"
 mtcnn = MTCNN(keep_all=True, min_face_size=20, post_process=False, device=device)
 
-# ------------------- Main Loop -------------------
 skipped = []
 
 for fname in os.listdir(INPUT_DIR):
@@ -31,22 +24,16 @@ for fname in os.listdir(INPUT_DIR):
     output_path = os.path.join(OUTPUT_DIR, fname)
 
     try:
-        # Bild laden
         img = Image.open(input_path).convert("RGB")
         img_np = np.array(img)
-        if img_np.dtype != np.uint8:
-            img_np = (img_np * 255).astype(np.uint8)
 
-        # Gesichter erkennen
         boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
+        aligned_img = None
         if boxes is None or landmarks is None or len(boxes[0]) == 0:
-            # Fallback: einfache Resize + Tensor
-            aligned_pil = transforms.functional.resize(img, ALIGNED_SIZE)
-            aligned = transforms.functional.to_tensor(aligned_pil)
-            aligned = normalize_to_neg_one_to_one(aligned.unsqueeze(0)).squeeze(0)
-            print(f"{fname}: 0 faces detected or invalid shape, fallback resize applied")
-
+            # fallback: einfach resize
+            aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
+            print(f"{fname}: 0 faces detected, fallback resize applied")
         else:
             # Wähle Gesicht, das am nächsten zur Bildmitte liegt
             box_centers = np.mean(boxes[0], axis=1)
@@ -55,27 +42,26 @@ for fname in os.listdir(INPUT_DIR):
             facial5points = landmarks[0][idx]
 
             # norm_crop
-            aligned_img = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
-            aligned = torch.from_numpy(aligned_img).permute(2,0,1)/255.0
-            aligned = normalize_to_neg_one_to_one(aligned.unsqueeze(0)).squeeze(0)
+            aligned_np = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
+            if aligned_np is None or aligned_np.size == 0:
+                aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
+                print(f"{fname}: norm_crop failed, fallback resize applied")
+            else:
+                aligned_img = Image.fromarray(aligned_np)
 
         # Speichern
-        print(fname, "aligned shape:", aligned.shape, "min/max:", aligned.min(), aligned.max())
-        # Tensor zurückskalieren auf [0,1] für save_image
-        aligned_to_save = (aligned + 1.0) / 2.0  # [-1,1] -> [0,1]
-        save_image(aligned_to_save, output_path)
-        #save_image(aligned, output_path)
-        print(f"Aligned {fname}")
+        aligned_img.save(output_path)
+        print(f"Aligned {fname} -> {output_path}")
 
     except Exception as e:
         print(f"Skipped {fname} due to {e}")
         skipped.append(fname)
 
-# ------------------- Log -------------------
 if skipped:
     with open(os.path.join(OUTPUT_DIR, "skipped.txt"), "w") as f:
         for s in skipped:
             f.write(s + "\n")
 
 print(f"Finished aligning. Skipped {len(skipped)} images.")
+
 
