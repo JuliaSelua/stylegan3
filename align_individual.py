@@ -1,0 +1,78 @@
+# align_individual.py
+import os
+from PIL import Image
+import torch
+import torchvision.transforms as transforms
+from torchvision.utils import save_image, make_grid
+from facenet_pytorch import MTCNN
+import numpy as np
+from utils.alignment.arcface import norm_crop  # iDiff utility
+
+# ------------------- Pfade -------------------
+INPUT_DIR = "out/id_samples"           # Ordner mit generierten Einzelbildern
+OUTPUT_DIR = "out/id_samples_aligned"  # Ordner für aligned Bilder
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+ALIGNED_SIZE = 112  # Größe nach norm_crop
+
+# ------------------- MTCNN Setup -------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+mtcnn = MTCNN(keep_all=True, min_face_size=1, post_process=False, device=device)
+
+# ------------------- Main Loop -------------------
+skipped = []
+
+for id_folder in os.listdir(INPUT_DIR):
+    id_path = os.path.join(INPUT_DIR, id_folder)
+    if not os.path.isdir(id_path):
+        continue
+
+    aligned_id_path = os.path.join(OUTPUT_DIR, id_folder)
+    os.makedirs(aligned_id_path, exist_ok=True)
+
+    for fname in os.listdir(id_path):
+        if not (fname.endswith(".png") or fname.endswith(".jpg")):
+            continue
+
+        input_path = os.path.join(id_path, fname)
+        output_path = os.path.join(aligned_id_path, fname)
+
+        try:
+            # Bild laden
+            img = Image.open(input_path).convert("RGB")
+            img_tensor = transforms.functional.to_tensor(img)
+            img_np = (img_tensor.permute(1,2,0).numpy() * 255).astype(np.uint8)
+
+            # Gesichter erkennen
+            boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
+            boxes = boxes[0]
+            landmarks = landmarks[0]
+
+            if landmarks is None or len(landmarks) == 0:
+                # Fallback: einfache Resize
+                aligned = transforms.functional.resize(img_tensor, ALIGNED_SIZE)
+            else:
+                # Gesicht auswählen, das am nächsten zur Bildmitte liegt
+                box_centers = np.mean(boxes, axis=1)
+                img_center = np.array([img_np.shape[1]/2, img_np.shape[0]/2])
+                idx = np.argmin(np.sum((box_centers - img_center)**2, axis=1))
+                facial5points = landmarks[idx]
+
+                # norm_crop
+                aligned_img = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
+                aligned = torch.from_numpy(aligned_img).permute(2,0,1) / 255.0
+
+            # Speichern
+            save_image(aligned, output_path)
+
+        except Exception as e:
+            print(f"Skipped {fname} due to {e}")
+            skipped.append(os.path.join(id_folder, fname))
+
+# ------------------- Log -------------------
+if skipped:
+    with open(os.path.join(OUTPUT_DIR, "skipped.txt"), "w") as f:
+        for s in skipped:
+            f.write(s + "\n")
+
+print(f"Finished aligning. Skipped {len(skipped)} images.")
