@@ -1,16 +1,15 @@
-# encode_individual_nohydra.py
+# encode_individual_fixed.py
 """
 Encode aligned StyleGAN images using face recognition backbones
-Output: embeddings.npy + labels.npy
+Output: embeddings.pt + labels.pt (Torch format)
 """
 
 import os
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-import numpy as np
 
-from utils.helpers import normalize_to_neg_one_to_one, ensure_path_join
+from utils.helpers import normalize_to_neg_one_to_one
 from utils.iresnet import iresnet100, iresnet50
 from utils.irse import IR_101
 from utils.synface_resnet import LResNet50E_IR
@@ -94,13 +93,13 @@ for id_folder in sorted(os.listdir(SAMPLES_DIR)):
         id_embeds = face_backbone(imgs)
         id_embeds = torch.nn.functional.normalize(id_embeds)
 
-    for embed in id_embeds.cpu().numpy():
-        embeddings.append(embed)
-        labels.append(id_folder)
+    embeddings.append(id_embeds.cpu())
+    labels.extend([id_folder] * id_embeds.shape[0])
 
 # ------------------- Save -------------------
-torch.save(np.array(embeddings), os.path.join(EMBEDDINGS_DIR, "embeddings.npy"))
-torch.save(np.array(labels), os.path.join(EMBEDDINGS_DIR, "labels.npy"))
+embeddings = torch.cat(embeddings, dim=0)  # alle IDs zusammenführen
+torch.save(embeddings, os.path.join(EMBEDDINGS_DIR, "embeddings.pt"))
+torch.save(labels, os.path.join(EMBEDDINGS_DIR, "labels.pt"))
 
 print("Encoding complete. Embeddings saved to", EMBEDDINGS_DIR)
 
