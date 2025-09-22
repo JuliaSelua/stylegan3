@@ -3,6 +3,7 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+import numpy as np
 
 from matplotlib import pylab
 import matplotlib.pyplot as plt
