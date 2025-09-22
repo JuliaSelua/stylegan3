@@ -25,34 +25,35 @@ for fname in sorted(os.listdir(INPUT_DIR)):
         img = Image.open(input_path).convert("RGB")
         img_np = np.array(img)
 
-        # Sicherstellen, dass es ein HxWx3 Array ist
+        # Sicherstellen, dass es HxWx3 ist
         if img_np.ndim != 3 or img_np.shape[2] != 3:
-            print(f"{fname}: invalid image shape {img_np.shape}, fallback resize applied")
             img_np = np.array(img.resize((ALIGNED_SIZE, ALIGNED_SIZE)))
 
         boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
 
-        aligned_img = None
-
-        if boxes is None or boxes[0] is None or len(boxes[0]) == 0:
-            # Kein Gesicht gefunden → fallback resize
-            aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
-            print(f"{fname}: 0 faces detected, fallback resize applied")
-        else:
-            # Wähle Gesicht in Bildmitte
+        if boxes is not None and boxes[0] is not None and len(boxes[0]) > 0:
+            # Gesicht gefunden → norm_crop
             box_centers = np.mean(boxes[0], axis=1)
-            img_center = np.array([img_np.shape[1] / 2, img_np.shape[0] / 2])
-            idx = np.argmin(np.sum((box_centers - img_center) ** 2, axis=1))
+            img_center = np.array([img_np.shape[1]/2, img_np.shape[0]/2])
+            idx = np.argmin(np.sum((box_centers - img_center)**2, axis=1))
             facial5points = landmarks[0][idx]
-
             aligned_np = norm_crop(img_np, landmark=facial5points, image_size=ALIGNED_SIZE, createEvalDB=True)
             aligned_img = Image.fromarray(aligned_np)
+            print(f"{fname}: face aligned")
+        else:
+            # Kein Gesicht → fallback resize
+            aligned_img = img.resize((ALIGNED_SIZE, ALIGNED_SIZE))
+            print(f"{fname}: 0 faces detected, fallback resize applied")
 
         aligned_img.save(output_path)
-        print(f"Aligned {fname}")
 
     except Exception as e:
         print(f"Skipped {fname} due to {e}")
         skipped.append(fname)
+
+if skipped:
+    with open(os.path.join(OUTPUT_DIR, "skipped.txt"), "w") as f:
+        for s in skipped:
+            f.write(s + "\n")
 
 print(f"Finished aligning. Skipped {len(skipped)} images.")
