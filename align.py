@@ -52,6 +52,7 @@ for fname in os.listdir(INPUT_DIR):
         # 2. Align Faces
         for tile in tiles:
             img_np = (tile.permute(1,2,0).numpy() * 255).astype(np.uint8)
+            print(tile.shape)
             boxes, _, landmarks = mtcnn.detect(img_np, landmarks=True)
 
             if landmarks is None:
