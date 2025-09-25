@@ -194,7 +194,7 @@ def main(**kwargs):
     if opts.cfg == 'stylegan2':
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_batch_id_loss=False, use_style_loss=True)
     elif opts.cfg == 'baseline':
-        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=True, use_style_loss=False)
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=False, use_style_loss=False)
     else:
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
 
@@ -213,7 +213,8 @@ def main(**kwargs):
     c.batch_gpu = opts.batch_gpu or opts.batch // opts.gpus
     c.G_kwargs.channel_base = c.D_kwargs.channel_base = opts.cbase
     c.G_kwargs.channel_max = c.D_kwargs.channel_max = opts.cmax
-    c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg == 'stylegan2' else 2) if opts.map_depth is None else opts.map_depth
+    #c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg == 'stylegan2' else 2) if opts.map_depth is None else opts.map_depth
+    c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg in ['stylegan2', 'baseline'] else 2) if opts.map_depth is None else opts.map_depth
     c.D_kwargs.block_kwargs.freeze_layers = opts.freezed
     c.D_kwargs.epilogue_kwargs.mbstd_group_size = opts.mbstd_group
     c.loss_kwargs.r1_gamma = opts.gamma
