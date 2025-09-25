@@ -191,8 +191,6 @@ def main(**kwargs):
     #c.D_kwargs = dnnlib.EasyDict(class_name='training.networks_stylegan2.Discriminator', block_kwargs=dnnlib.EasyDict(), mapping_kwargs=dnnlib.EasyDict(), epilogue_kwargs=dnnlib.EasyDict())
     c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
-    c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=(0, 0.99), eps=1e-8)
-    c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=(0, 0.99), eps=1e-8)
     if opts.cfg == 'stylegan2':
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=True, use_style_loss=True)
     elif opts.cfg == 'baseline' or opts.cfg == 'baseline3':
