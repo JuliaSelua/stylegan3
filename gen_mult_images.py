@@ -33,6 +33,8 @@ def generate_images(network_pkl: str, seeds: tuple, n_styles: int, outdir: str):
         np.random.seed(seed)
 
         z_id = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+        id_dir = os.path.join(outdir, f"id{seed:05d}")
+        os.makedirs(id_dir, exist_ok=True)
 
         for style_idx in range(n_styles):
             z_style = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
@@ -40,9 +42,8 @@ def generate_images(network_pkl: str, seeds: tuple, n_styles: int, outdir: str):
             img = G(z_id, None, z2=z_style)
             img = (img.clamp(-1,1) + 1) * 127.5
             img = img.permute(0,2,3,1).detach().cpu().numpy().astype(np.uint8)[0]
-
-            # save as id{seed}_style{style_idx}.png
-            PIL.Image.fromarray(img, 'RGB').save(f'{outdir}/id{seed}_style{style_idx}.png')
+            filename = os.path.join(id_dir, f"style{style_idx}.png")
+            PIL.Image.fromarray(img, 'RGB').save(filename)
 
 # ----------------------------------------------------------------------------
 
