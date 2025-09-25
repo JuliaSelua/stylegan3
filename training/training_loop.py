@@ -200,9 +200,7 @@ def training_loop(
             mb_ratio = reg_interval / (reg_interval + 1)
             opt_kwargs = dnnlib.EasyDict(opt_kwargs)
             opt_kwargs.lr = opt_kwargs.lr * mb_ratio
-            #opt_kwargs.betas = [float(beta) ** mb_ratio for beta in opt_kwargs.betas]
-            opt_kwargs.betas = tuple(float(beta) ** mb_ratio for beta in opt_kwargs.betas)
-            print("DEBUG betas:", opt_kwargs.betas, type(opt_kwargs.betas[0]), type(opt_kwargs.betas[1]))
+            opt_kwargs.betas = [float(beta) ** mb_ratio for beta in opt_kwargs.betas]
             opt = dnnlib.util.construct_class_by_name(module.parameters(), **opt_kwargs) # subclass of torch.optim.Optimizer
             phases += [dnnlib.EasyDict(name=name+'main', module=module, opt=opt, interval=1)]
             phases += [dnnlib.EasyDict(name=name+'reg', module=module, opt=opt, interval=reg_interval)]
