@@ -552,7 +552,7 @@ class Generator(torch.nn.Module):
             z2 = z
         ws = self.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         ws2 = self.mapping2(z2, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas) 
-        ws_concat = torch.cat([ws, ws2], dim=-1)
+        ws_concat = torch.cat([ws, ws2], dim=1)
         img = self.synthesis(ws_concat, update_emas=update_emas, **synthesis_kwargs)
         return img
 
