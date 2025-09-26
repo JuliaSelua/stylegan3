@@ -39,15 +39,24 @@ class StyleGAN2Loss(Loss):
         self.blur_init_sigma    = blur_init_sigma
         self.blur_fade_kimg     = blur_fade_kimg
 
-    def run_G(self, z, c, update_emas=False):
+    def run_G(self, z, c, z2=None, update_emas=False):
+        if z2 is None:
+            z2 = z
+        #z2 = torch.randn_like(z)
         ws = self.G.mapping(z, c, update_emas=update_emas)
+        ws2 = self.G.mapping2(z2, c, update_emas=update_emas)
+        ws_concat = torch.cat([ws, ws2], dim=-1)
         if self.style_mixing_prob > 0:
             with torch.autograd.profiler.record_function('style_mixing'):
-                cutoff = torch.empty([], dtype=torch.int64, device=ws.device).random_(1, ws.shape[1])
-                cutoff = torch.where(torch.rand([], device=ws.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws.shape[1]))
-                ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
-        img = self.G.synthesis(ws, update_emas=update_emas)
-        return img, ws
+                cutoff = torch.empty([], dtype=torch.int64, device=ws_concat.device).random_(1, ws_concat.shape[1])
+                cutoff = torch.where(torch.rand([], device=ws_concat.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws_concat.shape[1]))
+                ws:concat[:, cutoff:] = torch.cat([
+                    self.G.mapping(torch.randn_like(z), c, update_emas=False),
+                    self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
+                ], dim=-1)[:, cutoff:]
+        #img = self.G.synthesis(ws, update_emas=update_emas)
+        img = self.G(z, c, z2=z2, update_emas=update_emas)
+        return img, ws_concat
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
         blur_size = np.floor(blur_sigma * 3)
