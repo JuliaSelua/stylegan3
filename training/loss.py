@@ -69,7 +69,7 @@ class StyleGAN2Loss(Loss):
         logits = self.D(img, c, update_emas=update_emas)
         return logits
 
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -80,7 +80,7 @@ class StyleGAN2Loss(Loss):
         # Gmain: Maximize logits for generated images.
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
-                gen_img, _gen_ws = self.run_G(gen_z, gen_c)
+                gen_img, _gen_ws = self.run_G(gen_z, gen_c, gen_z2)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
@@ -93,7 +93,7 @@ class StyleGAN2Loss(Loss):
         if phase in ['Greg', 'Gboth']:
             with torch.autograd.profiler.record_function('Gpl_forward'):
                 batch_size = gen_z.shape[0] // self.pl_batch_shrink
-                gen_img, gen_ws = self.run_G(gen_z[:batch_size], gen_c[:batch_size])
+                gen_img, gen_ws = self.run_G(gen_z[:batch_size], gen_c[:batch_size], gen_z2[:batch_size])
                 pl_noise = torch.randn_like(gen_img) / np.sqrt(gen_img.shape[2] * gen_img.shape[3])
                 with torch.autograd.profiler.record_function('pl_grads'), conv2d_gradfix.no_weight_gradients(self.pl_no_weight_grad):
                     pl_grads = torch.autograd.grad(outputs=[(gen_img * pl_noise).sum()], inputs=[gen_ws], create_graph=True, only_inputs=True)[0]
@@ -111,7 +111,7 @@ class StyleGAN2Loss(Loss):
         loss_Dgen = 0
         if phase in ['Dmain', 'Dboth']:
             with torch.autograd.profiler.record_function('Dgen_forward'):
-                gen_img, _gen_ws = self.run_G(gen_z, gen_c, update_emas=True)
+                gen_img, _gen_ws = self.run_G(gen_z, gen_c, gen_z2, update_emas=True)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma, update_emas=True)
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
