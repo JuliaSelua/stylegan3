@@ -54,8 +54,8 @@ class StyleGAN2Loss(Loss):
                     self.G.mapping(torch.randn_like(z), c, update_emas=False),
                     self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
                 ], dim=-1)[:, cutoff:]
-        #img = self.G.synthesis(ws, update_emas=update_emas)
-        img = self.G(z, c, z2=z2, update_emas=update_emas)
+        img = self.G.synthesis(ws_concat, update_emas=update_emas)
+        #img = self.G(z, c, z2=z2, update_emas=update_emas)
         return img, ws_concat
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
