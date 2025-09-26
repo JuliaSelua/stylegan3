@@ -542,9 +542,9 @@ class Generator(torch.nn.Module):
         self.img_channels = img_channels
         self.synthesis = SynthesisNetwork(w_dim=2*w_dim, img_resolution=img_resolution, img_channels=img_channels, **synthesis_kwargs)
         self.num_ws = self.synthesis.num_ws
-        num_ws_per_mapping = self.num_ws // 2
-        self.mapping = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=num_ws_per_mapping, **mapping_kwargs)
-        self.mapping2 = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=num_ws_per_mapping, **mapping_kwargs)
+        #num_ws_per_mapping = self.num_ws // 2
+        self.mapping = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
+        self.mapping2 = MappingNetwork(z_dim=z_dim, c_dim=c_dim, w_dim=w_dim, num_ws=self.num_ws, **mapping_kwargs)
 
 
     def forward(self, z, c, z2=None, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
@@ -552,7 +552,7 @@ class Generator(torch.nn.Module):
             z2 = z
         ws = self.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
         ws2 = self.mapping2(z2, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas) 
-        ws_concat = torch.cat([ws, ws2], dim=1)
+        ws_concat = torch.cat([ws, ws2], dim=-1)
         img = self.synthesis(ws_concat, update_emas=update_emas, **synthesis_kwargs)
         return img
 
