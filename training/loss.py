@@ -78,7 +78,7 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss=True, use_batch_id_loss=False)):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss=True, use_batch_id_loss=False):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -111,7 +111,7 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('style_mixing'):
                 cutoff = torch.empty([], dtype=torch.int64, device=ws_concat.device).random_(1, ws_concat.shape[1])
                 cutoff = torch.where(torch.rand([], device=ws_concat.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws_concat.shape[1]))
-                ws:concat[:, cutoff:] = torch.cat([
+                ws_concat[:, cutoff:] = torch.cat([
                     self.G.mapping(torch.randn_like(z), c, update_emas=False),
                     self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
                 ], dim=-1)[:, cutoff:]
