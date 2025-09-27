@@ -125,7 +125,7 @@ def parse_comma_separated_list(s):
 
 # Required.
 @click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
-@click.option('--cfg',          help='Base configuration',                                      type=click.Choice(['stylegan3-t', 'stylegan3-r', 'stylegan2']), required=True)
+@click.option('--cfg',          help='Base configuration',                                      type=click.Choice(['stylegan3-t', 'stylegan3-r', 'stylegan2', 'baseline', 'idsim', 'iddissim', 'baseline3', 'idsim3', 'iddissim3']), required=True)
 @click.option('--data',         help='Training data', metavar='[ZIP|DIR]',                      type=str, required=True)
 @click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
 @click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
@@ -191,7 +191,17 @@ def main(**kwargs):
     c.D_kwargs = dnnlib.EasyDict(class_name='training.networks_stylegan2.Discriminator', block_kwargs=dnnlib.EasyDict(), mapping_kwargs=dnnlib.EasyDict(), epilogue_kwargs=dnnlib.EasyDict())
     c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
-    c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
+    if opts.cfg == 'stylegan2':
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=True, use_style_loss=True)
+    elif opts.cfg == 'baseline' or opts.cfg == 'baseline3':
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=False, use_style_loss=False)
+    elif opts.cfg == 'idsim' or opts.cfg == 'idsim3':
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=True, use_batch_id_loss=False, use_style_loss=False)
+    elif opts.cfg == 'iddissim' or opts.cfg == 'iddissim3':
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss',  use_id_loss=False, use_batch_id_loss=True, use_style_loss=False)
+    else:
+        c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
+
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
     # Training set.
@@ -207,11 +217,12 @@ def main(**kwargs):
     c.batch_gpu = opts.batch_gpu or opts.batch // opts.gpus
     c.G_kwargs.channel_base = c.D_kwargs.channel_base = opts.cbase
     c.G_kwargs.channel_max = c.D_kwargs.channel_max = opts.cmax
-    c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg == 'stylegan2' else 2) if opts.map_depth is None else opts.map_depth
+    #c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg == 'stylegan2' else 2) if opts.map_depth is None else opts.map_depth
+    c.G_kwargs.mapping_kwargs.num_layers = (8 if opts.cfg in ['stylegan2', 'baseline', 'idsim', 'iddissim'] else 2) if opts.map_depth is None else opts.map_depth
     c.D_kwargs.block_kwargs.freeze_layers = opts.freezed
     c.D_kwargs.epilogue_kwargs.mbstd_group_size = opts.mbstd_group
     c.loss_kwargs.r1_gamma = opts.gamma
-    c.G_opt_kwargs.lr = (0.002 if opts.cfg == 'stylegan2' else 0.0025) if opts.glr is None else opts.glr
+    c.G_opt_kwargs.lr = (0.002 if opts.cfg in ['stylegan2', 'baseline', 'idsim', 'iddissim']  else 0.0025) if opts.glr is None else opts.glr
     c.D_opt_kwargs.lr = opts.dlr
     c.metrics = opts.metrics
     c.total_kimg = opts.kimg
@@ -239,10 +250,17 @@ def main(**kwargs):
         c.G_reg_interval = 4 # Enable lazy regularization for G.
         c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
         c.loss_kwargs.pl_no_weight_grad = True # Speed up path length regularization by skipping gradient computation wrt. conv2d weights.
+    elif opts.cfg in ['baseline', 'idsim', 'iddissim']:
+        c.G_kwargs.class_name = 'training.networks_stylegan2.Generator'
+        c.loss_kwargs.style_mixing_prob = 0.9 # Enable style mixing regularization.
+        c.loss_kwargs.pl_weight = 2 # Enable path length regularization.
+        c.G_reg_interval = 4 # Enable lazy regularization for G.
+        c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
+        c.loss_kwargs.pl_no_weight_grad = True # Speed up path length regularization by skipping gradient computation wrt.
     else:
         c.G_kwargs.class_name = 'training.networks_stylegan3.Generator'
         c.G_kwargs.magnitude_ema_beta = 0.5 ** (c.batch_size / (20 * 1e3))
-        if opts.cfg == 'stylegan3-r':
+        if opts.cfg in ['stylegan3-r', 'baseline3-r', 'idsim3-r', 'iddissim3-r']:
             c.G_kwargs.conv_kernel = 1 # Use 1x1 convolutions.
             c.G_kwargs.channel_base *= 2 # Double the number of feature maps.
             c.G_kwargs.channel_max *= 2
