@@ -13,7 +13,62 @@ import torch
 from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
+import torch.nn.functional as F
 
+# LPIPS Style-Loss
+import lpips
+from utils.iresnet import iresnet100
+import torchvision.transforms as T
+
+# Transform für aligned Images
+transform = T.Compose([
+    T.ToTensor(),
+    T.Normalize(mean=[0.5]*3, std=[0.5]*3),
+])
+
+def load_elasticface(device):
+    ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location=device)
+    backbone = iresnet100(num_features=512).to(device)
+    backbone.load_state_dict(ckpt)
+    backbone.eval()
+    for p in backbone.parameters():
+        p.requires_grad = False
+    return backbone
+
+def get_face_embeddings_aligned(img_tensor, device="cuda:0", backbone=None):
+    img_tensor = img_tensor.to(device)
+    if img_tensor.shape[2:] != (112, 112):
+        img_tensor = F.interpolate(img_tensor, size=(112,112), mode='bilinear', align_corners=False)
+    if backbone is None:
+        raise ValueError("Backbone must be provided")
+    emb = backbone(img_tensor)
+    return F.normalize(emb, dim=1)
+
+def batch_id_loss(embeddings, lambda_pos=1.0, lambda_neg=1.0):
+    B, D = embeddings.shape
+    assert B % 2 == 0
+    emb = F.normalize(embeddings, dim=1)
+    sim = emb @ emb.t()
+    idx_a = torch.arange(0, B, 2, device=emb.device)
+    idx_b = idx_a + 1
+    pos_sims = sim[idx_a, idx_b]
+    pos_loss = (1.0 - pos_sims).mean()
+    mask = torch.ones_like(sim, dtype=torch.bool, device=emb.device)
+    mask.fill_diagonal_(False)
+    mask[idx_a, idx_b] = False
+    mask[idx_b, idx_a] = False
+    neg_sims = sim[mask]
+    neg_loss = F.relu(neg_sims.mean())
+    total = lambda_pos * pos_loss + lambda_neg * neg_loss
+    return total, pos_loss, neg_loss
+
+class StyleLossHelper:
+    def __init__(self, device):
+        self.lpips_alex = lpips.LPIPS(net='alex').eval().to(device)
+    def __call__(self, img1, img2):
+        device = next(self.lpips_alex.parameters()).device
+        img1, img2 = img1.to(device), img2.to(device)
+        return self.lpips_alex(img1, img2).mean()
 #----------------------------------------------------------------------------
 
 class Loss:
@@ -23,7 +78,7 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, use_id_loss=True, use_style_loss=True, use_batch_id_loss=False)):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -38,11 +93,17 @@ class StyleGAN2Loss(Loss):
         self.pl_mean            = torch.zeros([], device=device)
         self.blur_init_sigma    = blur_init_sigma
         self.blur_fade_kimg     = blur_fade_kimg
+        self.use_id_loss        = use_id_loss
+        self.use_style_loss     = use_style_loss
+        self.use_batch_id_loss  = use_batch_id_loss
+
+        self.style_loss_fn      = StyleLossHelper(device)
+        if self.use_id_loss or self.use_batch_id_loss:
+            self.backbone = load_elasticface(device)
 
     def run_G(self, z, c, z2=None, update_emas=False):
         if z2 is None:
             z2 = z
-        #z2 = torch.randn_like(z)
         ws = self.G.mapping(z, c, update_emas=update_emas)
         ws2 = self.G.mapping2(z2, c, update_emas=update_emas)
         ws_concat = torch.cat([ws, ws2], dim=-1)
@@ -55,7 +116,6 @@ class StyleGAN2Loss(Loss):
                     self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
                 ], dim=-1)[:, cutoff:]
         img = self.G.synthesis(ws_concat, update_emas=update_emas)
-        #img = self.G(z, c, z2=z2, update_emas=update_emas)
         return img, ws_concat
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
@@ -70,6 +130,8 @@ class StyleGAN2Loss(Loss):
         return logits
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
+        lambda_id = 1.0
+        lambda_style = 0.1
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -85,9 +147,34 @@ class StyleGAN2Loss(Loss):
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits) # -log(sigmoid(gen_logits))
-                training_stats.report('Loss/G/loss', loss_Gmain)
-            with torch.autograd.profiler.record_function('Gmain_backward'):
-                loss_Gmain.mean().mul(gain).backward()
+                #training_stats.report('Loss/G/loss', loss_Gmain)
+                # --- ID / Batch-ID / Style-Loss
+                if self.use_id_loss or self.use_batch_id_loss:
+                    emb = get_face_embeddings_aligned(gen_img, device=self.device, backbone=self.backbone)
+    
+                if self.use_id_loss:
+                    emb_a, emb_b = emb[0::2], emb[1::2]
+                    id_loss = (1 - (emb_a * emb_b).sum(dim=1)).mean()
+                    loss_Gmain = loss_Gmain + lambda_id * id_loss
+                    training_stats.report('Loss/G/id_loss', id_loss)
+    
+                if self.use_batch_id_loss:
+                    batch_id, pos_loss, neg_loss = batch_id_loss(emb)
+                    loss_Gmain = loss_Gmain + batch_id
+                    training_stats.report('Loss/G/id_loss', batch_id)
+                    training_stats.report('Loss/G/id_pos_loss', pos_loss)
+                    training_stats.report('Loss/G/id_neg_loss', neg_loss)
+    
+                if self.use_style_loss:
+                    img_a, img_b = gen_img[0::2], gen_img[1::2]
+                    style_loss = self.style_loss_fn(img_a, img_b)
+                    loss_Gmain = loss_Gmain + lambda_style * style_loss
+                    training_stats.report('Loss/G/style_loss', style_loss)
+    
+    
+                
+                with torch.autograd.profiler.record_function('Gmain_backward'):
+                    loss_Gmain.mean().mul(gain).backward()
 
         # Gpl: Apply path length regularization.
         if phase in ['Greg', 'Gboth']:
