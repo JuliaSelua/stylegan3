@@ -195,7 +195,9 @@ class StyleGAN2Loss(Loss):
                     style_loss = self.style_loss_fn(img_a, img_b)
                     loss_Gmain = loss_Gmain + lambda_style * style_loss
                     training_stats.report('Loss/G/style_loss', style_loss)
-    
+
+                training_stats.report('Loss/G/total', loss_Gmain)
+
     
                 
                 with torch.autograd.profiler.record_function('Gmain_backward'):
