@@ -564,7 +564,7 @@ class Generator(torch.nn.Module):
         ws_concat_flat = ws_concat.view(B*N, D)
         ws_reduced_flat = self.fullyconnected(ws_concat_flat)
         #ws_reduced = self.fullyconnected(ws_concat)
-        ws_reduced = ws_reduced_flat = ws_reduced_flat.view(B, N, self.w_dim)
+        ws_reduced = ws_reduced_flat.view(B, N, self.w_dim)
         img = self.synthesis(ws_reduced, update_emas=update_emas, **synthesis_kwargs)
         return img
 
