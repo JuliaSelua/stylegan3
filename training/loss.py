@@ -102,7 +102,32 @@ class StyleGAN2Loss(Loss):
             self.backbone = load_elasticface(device)
 
     def run_G(self, z, c, z2=None, update_emas=False):
+        # --- Mapping ---
         if z2 is None:
+            z2 = z
+        ws_id = self.G.mapping(z, c, update_emas=update_emas)
+        ws_style = self.G.mapping2(z2, c, update_emas=update_emas)
+    
+        # --- Optional: Style Mixing ---
+        if self.style_mixing_prob > 0:
+            with torch.autograd.profiler.record_function('style_mixing'):
+                cutoff = torch.empty([], dtype=torch.int64, device=ws_id.device).random_(1, ws_id.shape[1])
+                cutoff = torch.where(torch.rand([], device=ws_id.device) < self.style_mixing_prob,
+                                     cutoff,
+                                     torch.full_like(cutoff, ws_id.shape[1]))
+                ws_id[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
+                ws_style[:, cutoff:] = self.G.mapping2(torch.randn_like(z2), c, update_emas=False)[:, cutoff:]
+    
+        # --- Combine via FullyConnected ---
+        ws_concat = torch.cat([ws_id, ws_style], dim=-1)
+        B, N, D = ws_concat.shape
+        ws_reduced = self.G.fullyconnected(ws_concat.view(B*N, D)).view(B, N, self.G.w_dim)
+    
+        # --- Synthesis ---
+        img = self.G.synthesis(ws_reduced, update_emas=update_emas)
+        return img, ws_reduced
+
+        '''if z2 is None:
             z2 = z
         ws = self.G.mapping(z, c, update_emas=update_emas)
         ws2 = self.G.mapping2(z2, c, update_emas=update_emas)
@@ -116,7 +141,7 @@ class StyleGAN2Loss(Loss):
                     self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
                 ], dim=-1)[:, cutoff:]
         img = self.G.synthesis(ws_concat, update_emas=update_emas)
-        return img, ws_concat
+        return img, ws_concat'''
 
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
         blur_size = np.floor(blur_sigma * 3)
