@@ -156,7 +156,7 @@ class StyleGAN2Loss(Loss):
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
         lambda_id = 1.0
-        lambda_style = 0.1
+        lambda_style = 1.0
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
