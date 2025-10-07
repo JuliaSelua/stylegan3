@@ -180,7 +180,7 @@ class StyleGAN2Loss(Loss):
                 if self.use_id_loss:
                     emb_a, emb_b = emb[0::2], emb[1::2]
                     id_loss = (1 - (emb_a * emb_b).sum(dim=1)).mean()
-                    print("DEBUG: Erste 4 ID-Paare Cosine-Similarity:", ((emb_a * emb_b).sum(dim=1)[:4]).cpu().numpy())
+                    print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss.detach().view(-1)[:4].cpu().numpy())
                     loss_Gmain = loss_Gmain + lambda_id * id_loss
                     training_stats.report('Loss/G/id_loss', id_loss)
     
