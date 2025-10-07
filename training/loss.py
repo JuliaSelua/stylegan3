@@ -185,7 +185,7 @@ class StyleGAN2Loss(Loss):
     
                 if self.use_batch_id_loss:
                     batch_id, pos_loss, neg_loss = batch_id_loss(emb)
-                    loss_Gmain = loss_Gmain + batch_id
+                    loss_Gmain = loss_Gmain + lambda_id * batch_id
                     training_stats.report('Loss/G/id_loss', batch_id)
                     training_stats.report('Loss/G/id_pos_loss', pos_loss)
                     training_stats.report('Loss/G/id_neg_loss', neg_loss)
