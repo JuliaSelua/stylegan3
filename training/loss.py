@@ -192,9 +192,8 @@ class StyleGAN2Loss(Loss):
     
                 if self.use_style_loss:
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
-                    diff = (img_a - img_b).abs().mean(dim=[1,2,3])
                     style_loss = self.style_loss_fn(img_a, img_b)
-                    loss_Gmain = loss_Gmain + lambda_style * style_loss
+                    loss_Gmain = loss_Gmain - lambda_style * style_loss
                     training_stats.report('Loss/G/style_loss', style_loss)
 
                 training_stats.report('Loss/G/total', loss_Gmain)
