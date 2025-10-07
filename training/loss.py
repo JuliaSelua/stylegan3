@@ -168,6 +168,8 @@ class StyleGAN2Loss(Loss):
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, gen_z2)
+                print("DEBUG: Min/Max Generator Output:", gen_img.min().item(), gen_img.max().item())
+                print("DEBUG: Std Generator Output:", gen_img.std().item())
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
@@ -197,6 +199,10 @@ class StyleGAN2Loss(Loss):
     
                 if self.use_style_loss:
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
+                    diff = (img_a - img_b).abs().mean(dim=[1,2,3])
+
+                    print("DEBUG: Durchschnittliche Differenz pro Paar:", diff.cpu().numpy())
+
                     style_loss = self.style_loss_fn(img_a, img_b)
                     print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss.detach().view(-1)[:4].cpu().numpy())
                     loss_Gmain = loss_Gmain + lambda_style * style_loss
