@@ -194,7 +194,7 @@ class StyleGAN2Loss(Loss):
                 if self.use_style_loss:
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
                     style_loss = self.style_loss_fn(img_a, img_b)
-                    print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss[:4].cpu().numpy())
+                    print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss.detach().view(-1)[:4].cpu().numpy())
                     loss_Gmain = loss_Gmain + lambda_style * style_loss
                     training_stats.report('Loss/G/style_loss', style_loss)
 
