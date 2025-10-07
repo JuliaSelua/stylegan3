@@ -168,8 +168,6 @@ class StyleGAN2Loss(Loss):
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, gen_z2)
-                print("DEBUG: Min/Max Generator Output:", gen_img.min().item(), gen_img.max().item())
-                print("DEBUG: Std Generator Output:", gen_img.std().item())
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
@@ -182,16 +180,11 @@ class StyleGAN2Loss(Loss):
                 if self.use_id_loss:
                     emb_a, emb_b = emb[0::2], emb[1::2]
                     id_loss = (1 - (emb_a * emb_b).sum(dim=1)).mean()
-                    print("DEBUG: Erste 4 ID-Paare Cosine-Similarity:", ((emb_a * emb_b).sum(dim=1)[:4]).cpu().numpy())
                     loss_Gmain = loss_Gmain + lambda_id * id_loss
                     training_stats.report('Loss/G/id_loss', id_loss)
     
                 if self.use_batch_id_loss:
                     batch_id, pos_loss, neg_loss = batch_id_loss(emb)
-                        # DEBUG: Erste 4 Werte
-                    print("DEBUG: pos_loss:", pos_loss.item())  # .item() wandelt 0D-Tensor in float
-                    print("DEBUG: neg_loss:", neg_loss.item())
-                    print("DEBUG: batch_id:", batch_id.item())
                     loss_Gmain = loss_Gmain + batch_id
                     training_stats.report('Loss/G/id_loss', batch_id)
                     training_stats.report('Loss/G/id_pos_loss', pos_loss)
@@ -200,11 +193,7 @@ class StyleGAN2Loss(Loss):
                 if self.use_style_loss:
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
                     diff = (img_a - img_b).abs().mean(dim=[1,2,3])
-
-                    print("DEBUG: Durchschnittliche Differenz pro Paar:", diff.cpu().detach().numpy())
-
                     style_loss = self.style_loss_fn(img_a, img_b)
-                    print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss.detach().view(-1)[:4].cpu().numpy())
                     loss_Gmain = loss_Gmain + lambda_style * style_loss
                     training_stats.report('Loss/G/style_loss', style_loss)
 
