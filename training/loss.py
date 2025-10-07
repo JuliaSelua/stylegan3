@@ -201,7 +201,7 @@ class StyleGAN2Loss(Loss):
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
                     diff = (img_a - img_b).abs().mean(dim=[1,2,3])
 
-                    print("DEBUG: Durchschnittliche Differenz pro Paar:", diff.cpu().numpy())
+                    print("DEBUG: Durchschnittliche Differenz pro Paar:", diff.cpu().detach().numpy())
 
                     style_loss = self.style_loss_fn(img_a, img_b)
                     print("DEBUG: Erste 4 Style-Loss Werte (LPIPS):", style_loss.detach().view(-1)[:4].cpu().numpy())
