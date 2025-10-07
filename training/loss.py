@@ -187,10 +187,9 @@ class StyleGAN2Loss(Loss):
                 if self.use_batch_id_loss:
                     batch_id, pos_loss, neg_loss = batch_id_loss(emb)
                         # DEBUG: Erste 4 Werte
-                    print("DEBUG: Erste 4 pos_loss Werte:", pos_loss[:4].detach().cpu().numpy())
-                    print("DEBUG: Erste 4 neg_loss Werte:", neg_loss[:4].detach().cpu().numpy())
-                    print("DEBUG: batch_id Gesamtwert:", batch_id.item() if torch.numel(batch_id) == 1 else batch_id.detach().cpu().numpy())
-
+                    print("DEBUG: pos_loss:", pos_loss.item())  # .item() wandelt 0D-Tensor in float
+                    print("DEBUG: neg_loss:", neg_loss.item())
+                    print("DEBUG: batch_id:", batch_id.item())
                     loss_Gmain = loss_Gmain + batch_id
                     training_stats.report('Loss/G/id_loss', batch_id)
                     training_stats.report('Loss/G/id_pos_loss', pos_loss)
