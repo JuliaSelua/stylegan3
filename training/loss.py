@@ -64,7 +64,7 @@ def batch_id_loss(embeddings, lambda_pos=1.0, lambda_neg=1.0):
     total = lambda_pos * pos_loss + lambda_neg * neg_loss
     return total, pos_loss, neg_loss
 
-def get_beta(cur_kimg, T_kimg=25000, center=0.3, steepness=8.0): 
+def get_beta(cur_kimg, T_kimg=25000, center=5, steepness=8.0): 
     """Beta as sigmoid per kimgs""" 
     x = steepness * ((cur_kimg / T_kimg) - center) 
     return 1/(1 + math.exp(-x))
@@ -148,7 +148,7 @@ class StyleGAN2Loss(Loss):
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
         alpha = 0.5
         cur_kimg = cur_nimg/1000.0
-        beta = get_beta(cur_kimg, T_kimg=25000, center=0.3, steepness=8.0)
+        beta = get_beta(cur_kimg, T_kimg=25000, center=5, steepness=8.0)
         training_stats.report('Loss/G/beta', torch.as_tensor(beta, device=self.device))
 
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
