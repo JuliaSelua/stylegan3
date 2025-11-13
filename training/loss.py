@@ -20,6 +20,8 @@ import lpips
 from utils.iresnet import iresnet100
 import torchvision.transforms as T
 
+import math
+
 # Transform für aligned Images
 transform = T.Compose([
     T.ToTensor(),
@@ -61,6 +63,11 @@ def batch_id_loss(embeddings, lambda_pos=1.0, lambda_neg=1.0):
     neg_loss = F.relu(neg_sims.mean())
     total = lambda_pos * pos_loss + lambda_neg * neg_loss
     return total, pos_loss, neg_loss
+
+def get_beta(cur_kimg, T_kimg=25000, center=0.3, steepness=8.0): 
+    """Beta as sigmoid per kimgs""" 
+    x = steepness * ((cur_kimg / T_kimg) - center) 
+    return 1/(1 + math.exp(-x))
 
 class StyleLossHelper:
     def __init__(self, device):
@@ -127,22 +134,6 @@ class StyleGAN2Loss(Loss):
         img = self.G.synthesis(ws_reduced, update_emas=update_emas)
         return img, ws_reduced
 
-        '''if z2 is None:
-            z2 = z
-        ws = self.G.mapping(z, c, update_emas=update_emas)
-        ws2 = self.G.mapping2(z2, c, update_emas=update_emas)
-        ws_concat = torch.cat([ws, ws2], dim=-1)
-        if self.style_mixing_prob > 0:
-            with torch.autograd.profiler.record_function('style_mixing'):
-                cutoff = torch.empty([], dtype=torch.int64, device=ws_concat.device).random_(1, ws_concat.shape[1])
-                cutoff = torch.where(torch.rand([], device=ws_concat.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws_concat.shape[1]))
-                ws_concat[:, cutoff:] = torch.cat([
-                    self.G.mapping(torch.randn_like(z), c, update_emas=False),
-                    self.G.mapping2(torch.randn_like(z2), c, update_emas=False)
-                ], dim=-1)[:, cutoff:]
-        img = self.G.synthesis(ws_concat, update_emas=update_emas)
-        return img, ws_concat'''
-
     def run_D(self, img, c, blur_sigma=0, update_emas=False):
         blur_size = np.floor(blur_sigma * 3)
         if blur_size > 0:
@@ -155,8 +146,11 @@ class StyleGAN2Loss(Loss):
         return logits
 
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_z2, gen_c, gain, cur_nimg):
-        lambda_id = 0.5
-        lambda_style = 0.5
+        alpha = 0.5
+        cur_kimg = cur_nimg/1000.0
+        beta = get_beta(cur_kimg, T_kimg=25000, center=0.3, steepness=8.0)
+        training_stats.report('Loss/G/beta', torch.as_tensor(beta, device=self.device))
+
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.pl_weight == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -180,12 +174,12 @@ class StyleGAN2Loss(Loss):
                 if self.use_id_loss:
                     emb_a, emb_b = emb[0::2], emb[1::2]
                     id_loss = (1 - (emb_a * emb_b).sum(dim=1)).mean()
-                    loss_Gmain = loss_Gmain + lambda_id * id_loss
+                    loss_Gmain = loss_Gmain + beta * alpha * id_loss
                     training_stats.report('Loss/G/id_loss', id_loss)
     
                 if self.use_batch_id_loss:
                     batch_id, pos_loss, neg_loss = batch_id_loss(emb)
-                    loss_Gmain = loss_Gmain + lambda_id * batch_id
+                    loss_Gmain = loss_Gmain + beta * alpha * batch_id
                     training_stats.report('Loss/G/id_loss', batch_id)
                     training_stats.report('Loss/G/id_pos_loss', pos_loss)
                     training_stats.report('Loss/G/id_neg_loss', neg_loss)
@@ -193,7 +187,7 @@ class StyleGAN2Loss(Loss):
                 if self.use_style_loss:
                     img_a, img_b = gen_img[0::2], gen_img[1::2]
                     style_loss = self.style_loss_fn(img_a, img_b)
-                    loss_Gmain = loss_Gmain - lambda_style * style_loss
+                    loss_Gmain = loss_Gmain - beta * (1 - alpha) * style_loss
                     training_stats.report('Loss/G/style_loss', style_loss)
 
                 training_stats.report('Loss/G/total', loss_Gmain)
