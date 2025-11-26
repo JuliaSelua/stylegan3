@@ -1,0 +1,179 @@
+import os
+import torch
+import numpy as np
+from PIL import Image
+import multiprocessing as mp
+from functools import partial
+from tqdm import tqdm
+
+# Face alignment + embedding
+from facenet_pytorch import MTCNN
+from utils.alignment.arcface import norm_crop
+from utils.helpers import normalize_to_neg_one_to_one
+from utils.iresnet import iresnet100
+
+# Evaluation
+from pyeer.eer_info import get_eer_stats
+from pyeer.report import generate_eer_report
+import matplotlib.pyplot as plt
+
+# ============================================================
+# ALIGNMENT
+# ============================================================
+
+def align_single(img_path, outdir, mtcnn, size):
+    try:
+        img = Image.open(img_path).convert("RGB")
+        img_np = np.array(img)
+
+        boxes, _, landmarks = mtcnn.detect([img_np], landmarks=True)
+
+        if landmarks is not None and landmarks[0] is not None:
+            lms = np.array(landmarks[0][0], dtype=np.float32)
+            aligned = norm_crop(img_np, lms, image_size=size, createEvalDB=True)
+            aligned = np.clip(aligned, 0, 255).astype(np.uint8)
+        else:
+            aligned = np.array(img.resize((size, size)))
+
+        rel = os.path.relpath(img_path, start=os.path.dirname(outdir))
+        out_path = os.path.join(outdir, rel)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        Image.fromarray(aligned).save(out_path)
+
+    except Exception as e:
+        return img_path, str(e)
+    return None
+
+def align_parallel(input_dir, outdir, device, size=112, workers=12):
+    os.makedirs(outdir, exist_ok=True)
+    mtcnn = MTCNN(keep_all=True, min_face_size=20, device=device)
+
+    img_paths = [os.path.join(root, f)
+                 for root, _, files in os.walk(input_dir)
+                 for f in files if f.lower().endswith(".png")]
+
+    errors = []
+    with mp.Pool(workers) as pool:
+        for result in tqdm(pool.imap(partial(align_single, outdir=outdir, mtcnn=mtcnn, size=size), img_paths),
+                           total=len(img_paths), desc="Aligning", ncols=120):
+            if result is not None:
+                errors.append(result)
+    return errors
+
+# ============================================================
+# EMBEDDING
+# ============================================================
+
+def embed_images(input_dir, embed_dir, device, batch_size=256):
+    os.makedirs(embed_dir, exist_ok=True)
+
+    model = iresnet100(num_features=512)
+    ckpt = torch.load("utils/Elastic_R100_295672backbone.pth", map_location="cpu")
+    model.load_state_dict(ckpt)
+    model = model.to(device).eval()
+
+    img_files = []
+    labels = []
+    for id_folder in sorted(os.listdir(input_dir)):
+        id_path = os.path.join(input_dir, id_folder)
+        if not os.path.isdir(id_path):
+            continue
+        for fname in sorted(os.listdir(id_path)):
+            if fname.lower().endswith(".png"):
+                img_files.append(os.path.join(id_path, fname))
+                labels.append(id_folder)
+
+    embeddings = []
+
+    def load_tensor(path):
+        img = Image.open(path).convert("RGB").resize((112, 112))
+        t = torch.from_numpy(np.array(img)).permute(2,0,1).float() / 255.0
+        return t
+
+    for b in tqdm(range(0, len(img_files), batch_size), desc="Embedding", ncols=120):
+        batch_paths = img_files[b:b+batch_size]
+        imgs = torch.stack([load_tensor(p) for p in batch_paths])
+        imgs = normalize_to_neg_one_to_one(imgs).to(device)
+
+        with torch.no_grad():
+            emb = model(imgs)
+            emb = torch.nn.functional.normalize(emb)
+
+        embeddings.append(emb.cpu())
+
+    embeddings = torch.cat(embeddings, dim=0)
+    torch.save(embeddings, os.path.join(embed_dir, "embeddings.pt"))
+    torch.save(labels, os.path.join(embed_dir, "labels.pt"))
+    return embeddings, labels
+
+# ============================================================
+# EVALUATION
+# ============================================================
+
+def evaluate_embeddings(embeddings, labels, outdir, suffix=""):
+    os.makedirs(outdir, exist_ok=True)
+
+    emb = embeddings.numpy()
+    labels_np = np.array(labels)
+    norm = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    # Genuine similarity
+    genuine = []
+    for lbl in tqdm(np.unique(labels_np), desc="Genuine pairs", ncols=120):
+        idx = np.where(labels_np == lbl)[0]
+        if len(idx) > 1:
+            for i in range(len(idx)):
+                for j in range(i+1, len(idx)):
+                    genuine.append(np.dot(norm[idx[i]], norm[idx[j]]))
+
+    # Imposter similarity
+    imposter = []
+    for _ in tqdm(range(200000), desc="Imposter pairs", ncols=120):
+        i, j = np.random.randint(0, len(norm), 2)
+        if labels_np[i] != labels_np[j]:
+            imposter.append(np.dot(norm[i], norm[j]))
+
+    np.savetxt(os.path.join(outdir, "genuine_scores.txt"), genuine)
+    np.savetxt(os.path.join(outdir, "imposter_scores.txt"), imposter)
+
+    # Histogram
+    plt.figure(figsize=(8,6))
+    plt.hist(genuine, bins=100, alpha=0.5, label="Genuine")
+    plt.hist(imposter, bins=100, alpha=0.5, label="Imposter")
+    plt.legend()
+    plt.xlim(-1,1)
+    plt.title(f"Genuine vs Imposter ({suffix})")
+    plt.savefig(os.path.join(outdir, "similarity_hist.png"), dpi=300)
+    plt.close()
+
+    eer = get_eer_stats(genuine, imposter)
+    generate_eer_report([eer], ["synthetic"], os.path.join(outdir, "eer_report.html"))
+
+# ============================================================
+# MAIN
+# ============================================================
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", required=True)
+    parser.add_argument("--embed_dir", default="embeddings")
+    parser.add_argument("--aligned_dir", default="aligned")
+    parser.add_argument("--suffix", default="")
+    parser.add_argument("--align_workers", type=int, default=12)
+    args = parser.parse_args()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # ---- ALIGN ----
+    errors = align_parallel(args.input_dir, args.aligned_dir, device, workers=args.align_workers)
+    if errors:
+        print(f"Skipped {len(errors)} images due to errors.")
+
+    # ---- EMBEDDING ----
+    embeddings, labels = embed_images(args.aligned_dir, args.embed_dir, device)
+
+    # ---- EVALUATION ----
+    evaluate_embeddings(embeddings, labels, args.embed_dir, suffix=args.suffix)
+    print("Evaluation complete!")
