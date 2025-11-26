@@ -200,6 +200,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_ids", type=int, default=10000)
     parser.add_argument("--n_styles", type=int, default=50)
     parser.add_argument("--align_workers", type=int, default=12)
+    parser.add_argument("--gen_batch", type=int, default=16, help="Batch size for StyleGAN generation")
+
 
     args = parser.parse_args()
 
@@ -215,7 +217,8 @@ if __name__ == "__main__":
     eval_dir = os.path.join(args.outdir, "evaluation")
 
     # ---- 1) GENERATE ----
-    generate_images_id_style(G, gen_dir, args.n_ids, args.n_styles, device)
+    generate_images_id_style(G, gen_dir, args.n_ids, args.n_styles, device, gen_batch=args.gen_batch)
+
 
     # ---- 2) ALIGN ----
     errors = align_parallel(gen_dir, align_dir, device, workers=args.align_workers)
