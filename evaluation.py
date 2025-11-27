@@ -192,46 +192,23 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-# Optional: KDE hinzufügen (falls gewünscht)
-sns.kdeplot(
-    df[df["label"]=="genuine"]["score"],
-    color="#009D81",
-    alpha=0.6,
-)
-sns.kdeplot(
-    df[df["label"]=="imposter"]["score"],
-    color="#0083CC",
-    alpha=0.6,
-)
-
-
-# Histogramm für genuine
 sns.histplot(
-    df[df["label"]=="genuine"]["score"],
+    data=df,
+    x="score",
+    hue="label",
     stat="probability",
+    common_norm=False,
     bins=50,
-    alpha=0.6,
-    color="#009D81",
-    label="genuine"
+    kde=True,
+    palette={"genuine": "#009D81", "imposter": "#0083CC"},
+    alpha=0.6
 )
-
-# Histogramm für imposter
-sns.histplot(
-    df[df["label"]=="imposter"]["score"],
-    stat="probability",
-    bins=50,
-    alpha=0.6,
-    color="#0083CC",
-    label="imposter"
-)
-
-
-
-# EER-Linie ohne Legende
-plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend_")
 
 # Legende nur für genuine / imposter
 plt.legend(title=None)
+
+# EER-Linie ohne Legende
+plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend_")
 
 plt.xlabel("Cosine similarity", fontsize=14, fontweight='bold')
 plt.ylabel("Probability", fontsize=14, fontweight='bold')
