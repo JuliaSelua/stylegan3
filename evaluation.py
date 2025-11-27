@@ -19,7 +19,7 @@ parser.add_argument("--input_dir", type=str, required=True, help="Ordner mit Sty
 parser.add_argument("--suffix", type=str, default="", help="Suffix für Dateien/Plot-Titel")
 args = parser.parse_args()
 
-SUFFIX = f"_{args.suffix}" if args.suffix else ""
+SUFFIX = f"{args.suffix}" if args.suffix else ""
 
 INPUT_DIR = args.input_dir
 
@@ -192,26 +192,24 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-
-# Histogramme für genuine und imposter
-ax = sns.histplot(
+# Histogramm + KDE für genuine / imposter
+sns.histplot(
     data=df,
     x="score",
     hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
-    kde=False,  # nur Balken
+    kde=True,
     palette={"genuine": "#009D81", "imposter": "#0083CC"},
     alpha=0.6
 )
 
-# EER-Linie, nicht in Legend
-plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label='_nolegend_')
+# EER-Linie ohne Legende
+plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend_")
 
-# Legend nur für die Hue-Kategorien
-handles, labels = ax.get_legend_handles_labels()
-plt.legend(handles=handles, labels=labels, title=None)
+# Legende nur für genuine / imposter
+plt.legend(title=None)
 
 plt.xlabel("Cosine similarity", fontsize=14, fontweight='bold')
 plt.ylabel("Probability", fontsize=14, fontweight='bold')
