@@ -195,7 +195,7 @@ plt.figure(figsize=(10,6))
 sns.histplot(
     data=df,
     x="score",
-    #hue="label",
+    hue="",
     stat="probability",
     common_norm=False,
     bins=50,
