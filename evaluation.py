@@ -192,21 +192,22 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-ax = sns.histplot(
+sns.histplot(
     data=df,
     x="score",
     hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
-    kde=False,  # KDE hier ausschalten, wir plotten sie separat
+    kde=False,  # Histogramm, keine KDE hier
     palette={"genuine": "#009D81", "imposter": "#0083CC"},
     alpha=0.6
 )
 
-# KDE separat plotten mit Labels
-sns.kdeplot(df.loc[df.label=="genuine","score"], color="#009D81", label="genuine")
-sns.kdeplot(df.loc[df.label=="imposter","score"], color="#0083CC", label="imposter")
+# KDEs separat für die Legende, mit Label
+sns.kdeplot(df.loc[df.label=="genuine","score"], color="#009D81", label="genuine", linewidth=2)
+sns.kdeplot(df.loc[df.label=="imposter","score"], color="#0083CC", label="imposter", linewidth=2)
+
 
 
 # Optional: EER-Linie
