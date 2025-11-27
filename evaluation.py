@@ -192,17 +192,37 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-# Histogramm + KDE für genuine / imposter
+
+# Histogramm für genuine
 sns.histplot(
-    data=df,
-    x="score",
-    hue="label",
+    df[df["label"]=="genuine"]["score"],
     stat="probability",
-    common_norm=False,
     bins=50,
-    kde=True,
-    palette={"genuine": "#009D81", "imposter": "#0083CC"},
-    alpha=0.6
+    alpha=0.6,
+    color="#009D81",
+    label="genuine"
+)
+
+# Histogramm für imposter
+sns.histplot(
+    df[df["label"]=="imposter"]["score"],
+    stat="probability",
+    bins=50,
+    alpha=0.6,
+    color="#0083CC",
+    label="imposter"
+)
+
+# Optional: KDE hinzufügen (falls gewünscht)
+sns.kdeplot(
+    df[df["label"]=="genuine"]["score"],
+    color="#009D81",
+    alpha=0.6,
+)
+sns.kdeplot(
+    df[df["label"]=="imposter"]["score"],
+    color="#0083CC",
+    alpha=0.6,
 )
 
 # EER-Linie ohne Legende
