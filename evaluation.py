@@ -195,7 +195,7 @@ plt.figure(figsize=(10,6))
 sns.histplot(
     data=df,
     x="score",
-    hue="label",
+    #hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
@@ -212,7 +212,7 @@ plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend
 
 plt.xlabel("Cosine similarity", fontsize=14, fontweight='bold')
 plt.ylabel("Probability", fontsize=14, fontweight='bold')
-plt.title(f"Distribution of Genuine vs. Imposter Scores {SUFFIX}", fontsize=16, fontweight='bold')
+#plt.title(f"Distribution of Genuine vs. Imposter Scores {SUFFIX}", fontsize=16, fontweight='bold')
 plt.tight_layout()
 plot_path = os.path.join(EVAL_DIR, f"genuine_vs_imposter_distribution_{SUFFIX}.png")
 plt.savefig(plot_path, dpi=300)
