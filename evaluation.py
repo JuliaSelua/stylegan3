@@ -207,12 +207,13 @@ sns.histplot(
 #EER = 0.1939  # ersetze ggf. durch echten Wert
 #plt.axvline(EER, color="#EC6500", linestyle="--", label=f"EER = {EER:.3f}")
 #plt.axvline(eer_stats['threshold'], color="#EC6500", linestyle="--", label=f"EER = {eer_stats['eer']:.3f}")
-plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label=f"EER = {eer_stats.eer:.3f}")
+plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label=None)
+
+plt.legend(title=None)
 
 plt.xlabel("Cosine similarity", fontsize=14, fontweight='bold')
 plt.ylabel("Probability", fontsize=14, fontweight='bold')
 plt.title(f"Distribution of Genuine vs. Imposter Scores {SUFFIX}", fontsize=16, fontweight='bold')
-plt.legend(title="Score type")
 plt.tight_layout()
 plot_path = os.path.join(EVAL_DIR, f"genuine_vs_imposter_distribution_{SUFFIX}.png")
 plt.savefig(plot_path, dpi=300)
