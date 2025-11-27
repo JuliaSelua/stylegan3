@@ -205,7 +205,7 @@ sns.histplot(
 )
 
 # Legende nur für genuine / imposter
-plt.legend(title=None)
+#plt.legend(title=None)
 
 # EER-Linie ohne Legende
 plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend_")
@@ -216,6 +216,6 @@ plt.title(f"Distribution of Genuine vs. Imposter Scores {SUFFIX}", fontsize=16, 
 plt.tight_layout()
 plot_path = os.path.join(EVAL_DIR, f"genuine_vs_imposter_distribution_{SUFFIX}.png")
 plt.savefig(plot_path, dpi=300)
-plt.show()
+#plt.show()
 print("Seaborn plot saved to", plot_path)
 
