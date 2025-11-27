@@ -192,6 +192,18 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
+# Optional: KDE hinzufügen (falls gewünscht)
+sns.kdeplot(
+    df[df["label"]=="genuine"]["score"],
+    color="#009D81",
+    alpha=0.6,
+)
+sns.kdeplot(
+    df[df["label"]=="imposter"]["score"],
+    color="#0083CC",
+    alpha=0.6,
+)
+
 
 # Histogramm für genuine
 sns.histplot(
@@ -213,17 +225,7 @@ sns.histplot(
     label="imposter"
 )
 
-# Optional: KDE hinzufügen (falls gewünscht)
-sns.kdeplot(
-    df[df["label"]=="genuine"]["score"],
-    color="#009D81",
-    alpha=0.6,
-)
-sns.kdeplot(
-    df[df["label"]=="imposter"]["score"],
-    color="#0083CC",
-    alpha=0.6,
-)
+
 
 # EER-Linie ohne Legende
 plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label="_nolegend_")
