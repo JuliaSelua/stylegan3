@@ -191,17 +191,23 @@ df = pd.DataFrame({
 
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
-sns.histplot(
+
+ax = sns.histplot(
     data=df,
     x="score",
     hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
-    kde=True,
+    kde=False,  # KDE hier ausschalten, wir plotten sie separat
     palette={"genuine": "#009D81", "imposter": "#0083CC"},
     alpha=0.6
 )
+
+# KDE separat plotten mit Labels
+sns.kdeplot(df.loc[df.label=="genuine","score"], color="#009D81", label="genuine")
+sns.kdeplot(df.loc[df.label=="imposter","score"], color="#0083CC", label="imposter")
+
 
 # Optional: EER-Linie
 #EER = 0.1939  # ersetze ggf. durch echten Wert
