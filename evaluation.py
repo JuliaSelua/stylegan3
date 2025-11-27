@@ -192,7 +192,7 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-sns.histplot(
+ax = sns.histplot(
     data=df,
     x="score",
     hue="label",
