@@ -192,31 +192,26 @@ df = pd.DataFrame({
 sns.set_theme(style="whitegrid")
 plt.figure(figsize=(10,6))
 
-sns.histplot(
+
+# Histogramme für genuine und imposter
+ax = sns.histplot(
     data=df,
     x="score",
     hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
-    kde=False,  # Histogramm, keine KDE hier
+    kde=False,  # nur Balken
     palette={"genuine": "#009D81", "imposter": "#0083CC"},
     alpha=0.6
 )
 
-# KDEs separat für die Legende, mit Label
-sns.kdeplot(df.loc[df.label=="genuine","score"], color="#009D81", label="genuine", linewidth=2)
-sns.kdeplot(df.loc[df.label=="imposter","score"], color="#0083CC", label="imposter", linewidth=2)
+# EER-Linie, nicht in Legend
+plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label='_nolegend_')
 
-
-
-# Optional: EER-Linie
-#EER = 0.1939  # ersetze ggf. durch echten Wert
-#plt.axvline(EER, color="#EC6500", linestyle="--", label=f"EER = {EER:.3f}")
-#plt.axvline(eer_stats['threshold'], color="#EC6500", linestyle="--", label=f"EER = {eer_stats['eer']:.3f}")
-plt.axvline(x=eer_stats.eer_th, color='orange', linestyle='--', label=None)
-
-plt.legend(title=None)
+# Legend nur für die Hue-Kategorien
+handles, labels = ax.get_legend_handles_labels()
+plt.legend(handles=handles, labels=labels, title=None)
 
 plt.xlabel("Cosine similarity", fontsize=14, fontweight='bold')
 plt.ylabel("Probability", fontsize=14, fontweight='bold')
