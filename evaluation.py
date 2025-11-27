@@ -195,7 +195,7 @@ plt.figure(figsize=(10,6))
 sns.histplot(
     data=df,
     x="score",
-    hue="",
+    hue="label",
     stat="probability",
     common_norm=False,
     bins=50,
@@ -203,6 +203,10 @@ sns.histplot(
     palette={"genuine": "#009D81", "imposter": "#0083CC"},
     alpha=0.6
 )
+
+legend = ax.get_legend()
+if legend is not None:
+    legend.set_title(None)
 
 # Legende nur für genuine / imposter
 #plt.legend(title=None)
