@@ -210,8 +210,8 @@ if legend is not None:
 
 
 # Achsenlimits setzen
-ax.set_xlim(-1.1, 1.1)   # x-Achse von -1 bis 1
-ax.set_ylim(0, 0.8)  # y-Achse von 0 bis 0.8
+#ax.set_xlim(-1.1, 1.1)   # x-Achse von -1 bis 1
+#ax.set_ylim(0, 0.8)  # y-Achse von 0 bis 0.8
 
 # Legende nur für genuine / imposter
 #plt.legend(title=None)
