@@ -15,6 +15,7 @@ import PIL.Image
 import json
 import torch
 import dnnlib
+from lmdb_dataset import LmdbDataset
 
 try:
     import pyspng
@@ -150,6 +151,48 @@ class Dataset(torch.utils.data.Dataset):
     @property
     def has_onehot_labels(self):
         return self._get_raw_labels().dtype == np.int64
+
+#----------------------------------------------------------------------------
+
+class LmdbImageDataset(Dataset):
+    def __init__(self,
+        path,                   # Path to LMDB
+        resolution      = None, # Required resolution
+        **super_kwargs,
+    ):
+        self._path = path
+        self._lmdb = LmdbDataset(path)
+
+        # Raw shape frm first sample
+        img, _ = self._lmdb[0]
+        raw_shape = [len(self._lmdb)] + list(img.shape)
+
+        if resolution is not None:
+            if raw_shape[2] != resolution or raw_shape[3] != resolution:
+                raise IOError('LMDB images do not match the specified resolution')
+
+        name = os.path.splitext(os.path.basename(path))[0]
+
+        # use_labels = False
+        super().__init__(
+            name=name,
+            raw_shape=raw_shape,
+            use_labels=False,
+            **super_kwargs,
+        )
+
+    def _load_raw_image(self, raw_idx):
+        img, _ = self._lmdb[raw_idx]
+
+        # torch.Tensor -> numpy
+        if isinstance(img, torch.Tensor):
+            img = img.numpy()
+
+        assert img.dtype == np.uint8
+        return img
+
+    def _load_raw_labels(self):
+        return None
 
 #----------------------------------------------------------------------------
 
