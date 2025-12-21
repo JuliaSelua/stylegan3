@@ -157,12 +157,13 @@ class Dataset(torch.utils.data.Dataset):
 class LmdbImageDataset(Dataset):
     def __init__(self, path, resolution=None, **super_kwargs):
         self._path = path
-        self._lmdb = None  # LMDB erst im Worker öffnen
+        self._lmdb = None  
         self._resolution = resolution
-
-        # Rohdaten vorm ersten Sample nur Dummy-Shape setzen
-        dummy_img, _ = self._open_first_image()
-        raw_shape = [len(self), *dummy_img.shape]
+        from lmdb_dataset import LmdbDataset
+        tmp_lmdb = LmdbDataset(path)
+        first_img, _ = tmp_lmdb[0]
+        raw_shape = [len(tmp_lmdb)] + list(first_img.shape)
+        del tmp_lmdb 
 
         name = os.path.splitext(os.path.basename(path))[0]
         super().__init__(name=name, raw_shape=raw_shape, use_labels=False, **super_kwargs)
