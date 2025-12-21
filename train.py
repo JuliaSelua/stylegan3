@@ -102,9 +102,20 @@ def launch_training(c, desc, outdir, dry_run):
 def init_dataset_kwargs(data):
     try:
         if data.endswith('.lmdb_dataset'):
-            dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.LmdbImageDataset', path=data, use_labels=True, max_size=None, xflip=False)
+            dataset_kwargs = dnnlib.EasyDict(
+                class_name='training.dataset.LmdbImageDataset',
+                path=data,
+                max_size=None,
+                xflip=False
+            )
         else:
-            dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
+            dataset_kwargs = dnnlib.EasyDict(
+                class_name='training.dataset.ImageFolderDataset',
+                path=data,
+                use_labels=True,
+                max_size=None,
+                xflip=False
+            )
 
         #dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
         dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
