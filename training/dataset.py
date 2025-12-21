@@ -173,13 +173,13 @@ class LmdbImageDataset(Dataset):
 
         name = os.path.splitext(os.path.basename(path))[0]
 
-        # use_labels = False
+        super_kwargs.pop("use_labels", None)
         super().__init__(
             name=name,
             raw_shape=raw_shape,
-            use_labels=False,
             **super_kwargs,
         )
+
 
     def _load_raw_image(self, raw_idx):
         img, _ = self._lmdb[raw_idx]
