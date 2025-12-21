@@ -219,7 +219,20 @@ def main(**kwargs):
     else:
         c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
 
-    c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
+    #c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
+    
+    if opts.data.endswith('.lmdb_dataset'):
+        c.data_loader_kwargs = dnnlib.EasyDict(
+        pin_memory=True,
+        num_workers=0
+    )
+    else:
+        c.data_loader_kwargs = dnnlib.EasyDict(
+            pin_memory=True,
+            num_workers=opts.workers,
+            prefetch_factor=2
+        )
+
 
     # Training set.
     c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data)
