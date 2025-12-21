@@ -155,44 +155,31 @@ class Dataset(torch.utils.data.Dataset):
 #----------------------------------------------------------------------------
 
 class LmdbImageDataset(Dataset):
-    def __init__(self,
-        path,                   # Path to LMDB
-        resolution      = None, # Required resolution
-        **super_kwargs,
-    ):
+    def __init__(self, path, resolution=None, **super_kwargs):
         self._path = path
-        self._lmdb = LmdbDataset(path)
+        self._lmdb = None  # LMDB erst im Worker öffnen
+        self._resolution = resolution
 
-        # Raw shape frm first sample
-        img, _ = self._lmdb[0]
-        raw_shape = [len(self._lmdb)] + list(img.shape)
-
-        if resolution is not None:
-            if raw_shape[2] != resolution or raw_shape[3] != resolution:
-                raise IOError('LMDB images do not match the specified resolution')
+        # Rohdaten vorm ersten Sample nur Dummy-Shape setzen
+        dummy_img, _ = self._open_first_image()
+        raw_shape = [len(self), *dummy_img.shape]
 
         name = os.path.splitext(os.path.basename(path))[0]
+        super().__init__(name=name, raw_shape=raw_shape, use_labels=False, **super_kwargs)
 
-        super_kwargs.pop("use_labels", None)
-        super().__init__(
-            name=name,
-            raw_shape=raw_shape,
-            **super_kwargs,
-        )
-
+    def _open_lmdb(self):
+        if self._lmdb is None:
+            from lmdb_dataset import LmdbDataset
+            self._lmdb = LmdbDataset(self._path)
 
     def _load_raw_image(self, raw_idx):
+        self._open_lmdb()
         img, _ = self._lmdb[raw_idx]
-
-        # torch.Tensor -> numpy
         if isinstance(img, torch.Tensor):
             img = img.numpy()
-
         assert img.dtype == np.uint8
         return img
 
-    def _load_raw_labels(self):
-        return None
 
 #----------------------------------------------------------------------------
 
