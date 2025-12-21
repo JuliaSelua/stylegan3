@@ -157,15 +157,23 @@ class Dataset(torch.utils.data.Dataset):
 class LmdbImageDataset(Dataset):
     def __init__(self, path, resolution=None, **super_kwargs):
         self._path = path
-        self._lmdb = None  
+        self._lmdb = None
         self._resolution = resolution
+
+        # Temporäres LMDB öffnen, nur um raw_shape zu ermitteln
         from lmdb_dataset import LmdbDataset
         tmp_lmdb = LmdbDataset(path)
         first_img, _ = tmp_lmdb[0]
         raw_shape = [len(tmp_lmdb)] + list(first_img.shape)
-        del tmp_lmdb 
+        del tmp_lmdb  # sofort schließen
 
         name = os.path.splitext(os.path.basename(path))[0]
+
+        # Entferne use_labels aus super_kwargs, um doppelte Übergabe zu verhindern
+        if 'use_labels' in super_kwargs:
+            del super_kwargs['use_labels']
+
+        # Dataset initialisieren, use_labels nur einmal hier setzen
         super().__init__(name=name, raw_shape=raw_shape, use_labels=False, **super_kwargs)
 
     def _open_lmdb(self):
@@ -176,10 +184,18 @@ class LmdbImageDataset(Dataset):
     def _load_raw_image(self, raw_idx):
         self._open_lmdb()
         img, _ = self._lmdb[raw_idx]
+
+        # torch.Tensor -> numpy
         if isinstance(img, torch.Tensor):
             img = img.numpy()
+
         assert img.dtype == np.uint8
         return img
+
+    def _load_raw_labels(self):
+        # LMDB Dataset hat standardmäßig keine Labels
+        return None
+
 
 
 #----------------------------------------------------------------------------
