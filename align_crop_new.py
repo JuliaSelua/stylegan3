@@ -1,0 +1,135 @@
+import os
+import cv2
+from tqdm import tqdm
+import argparse
+from os.path import join as ojoin
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+from PIL import Image
+
+from utils.align_trans import norm_crop
+from facenet_pytorch import MTCNN
+import torch
+
+# MTCNN initialisieren
+mtcnn = MTCNN(
+    select_largest=True, min_face_size=10, post_process=False, device="cuda:0"
+)
+
+# Bilder laden
+def load_syn_paths(datadir, num_imgs=0):
+    img_files = sorted(f for f in os.listdir(datadir) if f.lower().endswith(('.png', '.jpg', '.jpeg')))
+    if num_imgs > 0:
+        img_files = img_files[:num_imgs]
+    return [ojoin(datadir, f) for f in img_files]
+
+def load_real_paths(datadir, num_imgs=0):
+    img_paths = []
+    id_folders = sorted(os.listdir(datadir))
+    for id in id_folders:
+        folder_path = os.path.join(datadir, id)
+        if not os.path.isdir(folder_path):
+            continue  # skip files like dataset.json
+        img_files = sorted(os.listdir(folder_path))
+        img_paths += [os.path.join(folder_path, f_name) for f_name in img_files
+                      if f_name.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    img_paths = img_paths if num_imgs == 0 else img_paths[:num_imgs]
+    return img_paths
+
+
+def is_folder_structure(datadir):
+    img_path = sorted(os.listdir(datadir))[0]
+    img_path = ojoin(datadir, img_path)
+    return os.path.isdir(img_path)
+
+# Dataset
+class InferenceDataset(Dataset):
+    def __init__(self, datadir, num_imgs=0, folder_structure=False):
+        self.folder_structure = folder_structure
+        if self.folder_structure:
+            self.img_paths = load_real_paths(datadir, num_imgs)
+        else:
+            self.img_paths = load_syn_paths(datadir, num_imgs)
+        print("Amount of images:", len(self.img_paths))
+
+    def __getitem__(self, index):
+        img_path = self.img_paths[index]
+        img_file = os.path.split(img_path)[-1]
+        if self.folder_structure:
+            tmp = os.path.dirname(img_path)
+            img_file = ojoin(os.path.basename(tmp), img_file)
+        img = cv2.imread(img_path)
+        if img is None:
+            print("Konnte Bild nicht lesen:", img_path)
+
+        return img, img_file
+
+    def __len__(self):
+        return len(self.img_paths)
+
+# Alignment
+def align_images(in_folder, out_folder, num_imgs=0, evalDB=False):
+    os.makedirs(out_folder, exist_ok=True)
+    
+    # Prüfen, ob Ordnerstruktur vorhanden ist
+    is_folder = is_folder_structure(in_folder)
+    
+    # Dataset laden
+    dataset = InferenceDataset(in_folder, num_imgs=num_imgs, folder_structure=is_folder)
+    
+    skipped_imgs = []
+
+    for img, img_name in tqdm(dataset):
+        if img is None:
+            skipped_imgs.append(img_name)
+            continue
+
+        # Konvertiere in RGB für MTCNN
+        pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
+        # Face Detection
+        boxes, probs, landmarks = mtcnn.detect(pil_img, landmarks=True)
+
+        if landmarks is None or not isinstance(landmarks[0], (list, np.ndarray)):
+            skipped_imgs.append(img_name)
+            continue
+
+        # Gesichtspunkte
+        facial5points = np.array(landmarks[0], dtype=np.float32)
+
+        # Output Pfad
+        out_path = out_folder
+        if is_folder:
+            id_dir = os.path.split(img_name)[0]
+            out_path = ojoin(out_folder, id_dir)
+            os.makedirs(out_path, exist_ok=True)
+            img_name = os.path.split(img_name)[1]
+
+        # Normales Cropping
+        warped_face = norm_crop(img, landmark=facial5points, image_size=112, createEvalDB=evalDB)
+        cv2.imwrite(os.path.join(out_path, img_name), warped_face)
+
+    print(f"Images with no Face: {len(skipped_imgs)}")
+    if skipped_imgs:
+        print("Skipped images:", skipped_imgs[:20], "...")  # nur die ersten 20
+
+
+# CLI
+def main():
+    parser = argparse.ArgumentParser(description="MTCNN alignment")
+    parser.add_argument("--in_folder", type=str, required=True, help="folder with images")
+    parser.add_argument("--out_folder", type=str, required=True, help="folder to save aligned images")
+    parser.add_argument("--batchsize", type=int, default=32)
+    parser.add_argument("--evalDB", type=int, default=0, help="1 for eval DB alignment")
+    parser.add_argument("--num_imgs", type=int, default=0, help="amount of images to align; 0 for all images")
+    args = parser.parse_args()
+
+    align_images(
+        args.in_folder,
+        args.out_folder,
+        num_imgs=args.num_imgs,
+        evalDB=args.evalDB == 1,
+    )
+
+if __name__ == "__main__":
+    main()

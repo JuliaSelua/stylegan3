@@ -219,10 +219,16 @@ def training_loop(
         print('Exporting sample images...')
         grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
         save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
+        #grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
+        #grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
+        #images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
+        #save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
         grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
+        grid_z2 = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
         grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
-        images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
+        images = torch.cat([G_ema(z=z, c=c, z2=z2, noise_mode='const').cpu() for z, c, z2 in zip(grid_z, grid_c, grid_z2)]).numpy()
         save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
+
 
     # Initialize logs.
     if rank == 0:
@@ -258,14 +264,25 @@ def training_loop(
             phase_real_img, phase_real_c = next(training_set_iterator)
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
-            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+            #all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            #all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+            #all_gen_z2 = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            #all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in all_gen_z2.split(batch_size)]
+            num_identities = (len(phases) * batch_size) // 2
+            z_id_unique = torch.randn([num_identities, G.z_dim], device=device) 
+            z_id = z_id_unique.repeat_interleave(2, dim=0) #twice the same id
+            z_style = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+
+            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in z_id.split(batch_size)]
+            all_gen_z2 = [phase_gen_z2.split(batch_gpu) for phase_gen_z2 in z_style.split(batch_size)]
+
+            
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
 
         # Execute training phases.
-        for phase, phase_gen_z, phase_gen_c in zip(phases, all_gen_z, all_gen_c):
+        for phase, phase_gen_z, phase_gen_z2, phase_gen_c in zip(phases, all_gen_z, all_gen_z2, all_gen_c):
             if batch_idx % phase.interval != 0:
                 continue
             if phase.start_event is not None:
@@ -274,8 +291,8 @@ def training_loop(
             # Accumulate gradients.
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
-            for real_img, real_c, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_c):
-                loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_c=gen_c, gain=phase.interval, cur_nimg=cur_nimg)
+            for real_img, real_c, gen_z, gen_z2, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_z2, phase_gen_c):
+                loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_z2=gen_z2, gen_c=gen_c, gain=phase.interval, cur_nimg=cur_nimg)
             phase.module.requires_grad_(False)
 
             # Update weights.
